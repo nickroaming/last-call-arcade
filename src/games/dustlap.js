@@ -2,15 +2,20 @@
 import { TAU, clamp, rand, lerp, angleDiff, choice, dist } from '../engine/util.js';
 import { art, SEAT_COLORS } from '../engine/sprites.js';
 import { S } from '../engine/gfx.js';
+import { Guns, newGunState } from '../game/weapons.js';
+import { twistEnv } from '../game/twists.js';
+import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 
 export const meta = {
   id: 'dustlap', name: 'DUST LAP', color: '#ff9a2e', music: 'dustlap',
   tagline: 'A dusk desert sprint',
   objective: 'Drive through every gate. First to finish the laps wins.',
-  controls: [['STICK', 'Steer (point where to go)'], ['A (HOLD)', 'Drift, release to boost'], ['X', 'Hop over hazards'], ['RB', 'Brace: unbumpable 1s']],
+  controls: [['STICK', 'Steer (point where to go)'], ['A (HOLD)', 'Drift, release to boost'], ['X / RT', 'Blaster: hits spin rivals out'], ['RB', 'Hop over hazards and shots']],
   hazards: 'Tumbleweeds / rolling boulders / cactus / dust devils that spin you',
   ghost: 'Everyone stays in the race until the end',
   tiebreak: 'Finish order > laps and gates done > closer to the next gate',
+  gunUse: 'Your car blaster (X)', blockUse: 'Your hop (RB) recharge', bodyUse: 'Your car',
+  twists: ['wind', 'rubber', 'giant', 'warp', 'ice', 'hyper', 'bullettime'],
 };
 
 const POINTS = [[40, 38], [150, 32], [262, 36], [298, 62], [290, 88], [220, 92], [170, 110], [176, 134], [240, 142], [296, 154], [270, 166], [150, 164], [48, 164], [18, 140], [52, 112], [22, 80], [24, 54]];
@@ -89,7 +94,8 @@ function buildTrack(flip) {
 }
 
 export function create(ctx) {
-  const fx = ctx.fx, sound = ctx.sound;
+  const fx = ctx.fx, sound = ctx.sound, tw = ctx.twist || null;
+  let env = twistEnv(tw, 0);
   const T = buildTrack(ctx.variant % 2 === 1);
   const LAPS = T.len > 820 ? 2 : 3;
   const onTrack = (x, y) => T.mask[clamp(Math.floor(y), 0, 179) * 320 + clamp(Math.floor(x), 0, 319)] === 1;
@@ -99,11 +105,13 @@ export function create(ctx) {
   const cars = ctx.players.map((pl, i) => {
     const [x, y] = back(10 + (i % 2) * 6, (i - 1) * 9);
     const st = pl.stats;
-    return {
-      seat: pl.seat, idx: pl.idx, st, x, y, ang: g0.a, vx: 0, vy: 0, speed: 0, r: 4.5 * st.size,
-      drifting: false, charge: 0, boostT: 0, hopT: 0, hopMax: 0.42 * Math.pow(st.jump, 1.6), hopCd: 0, braceT: 0, braceCd: 0,
-      spinT: 0, shields: st.shields, next: 0, lap: -1, finished: false, finishT: 0, wrongT: 0, bounceCd: 0, flashT: 0, bumpCd: 0,
+    const c = {
+      seat: pl.seat, idx: pl.idx, x, y, ang: g0.a, vx: 0, vy: 0, speed: 0, r: 4.5 * st.size, mult: pl.pickupMult ?? 1, gs: newGunState(st.gun),
+      drifting: false, charge: 0, boostT: 0, hopT: 0, hopMax: 0.42 * Math.pow(st.jump * (1 / st.grav), 1.3), hopCd: 0, braceT: 0, braceCd: 0,
+      spinT: 0, shields: st.shields, next: 0, lap: -1, finished: false, finishT: 0, wrongT: 0, bounceCd: 0, flashT: 0, bumpCd: 0, slowT: 0,
     };
+    c.pos = () => [c.x, c.y];
+    return makeBuffable(c, st);
   });
 
   const cacti = [2, 5, 8, 10].map((gi, k) => {
@@ -131,7 +139,7 @@ export function create(ctx) {
   function hazardHit(c, hx, hy, label) {
     if (c.hopT > 0) return false;
     const d = Math.hypot(c.x - hx, c.y - hy) || 1;
-    if (c.st.bounces > 0 && c.bounceCd <= 0) {
+    if (false) {
       c.bounceCd = 3; c.boostT = 0.6; c.speed = Math.max(c.speed, 120 * c.st.speed);
       c.vx += ((c.x - hx) / d) * 60; c.vy += ((c.y - hy) / d) * 60;
       fx.popup('BOING!', c.x, c.y - 10, '#7dff8a', 1); sound.sfx('boing'); return true;
@@ -149,6 +157,7 @@ export function create(ctx) {
 
   game.update = (dt, controls) => {
     t += dt;
+    env = { ...twistEnv(tw, t), ice: tw && tw.ice };
     // ---- hazards ----
     weedT -= dt;
     if (weedT <= 0) {
@@ -187,6 +196,7 @@ export function create(ctx) {
     // ---- cars ----
     for (const c of cars) {
       const k = controls.get(c.seat);
+      tickBuffs(c, dt); c.slowT -= dt;
       c.flashT -= dt; c.hopCd -= dt; c.braceCd -= dt; c.braceT -= dt; c.bounceCd -= dt; c.boostT -= dt; c.bumpCd -= dt;
       if (c.hopT > 0) c.hopT -= dt;
       const track = onTrack(c.x, c.y);
@@ -195,7 +205,7 @@ export function create(ctx) {
       } else {
         const mag = Math.hypot(k.mx, k.my);
         const sz = Math.sqrt(c.st.size);
-        let turn = (3.0 + 0.8 * c.st.homing) / sz;
+        let turn = (3.0 + 0.6 * c.st.gun.homing) / sz;
         const wantDrift = k.jump && c.speed > 45;
         if (wantDrift && !c.drifting) { c.drifting = true; c.charge = 0; }
         if (c.drifting) turn *= 1.55;
@@ -212,10 +222,10 @@ export function create(ctx) {
           if (!wantDrift) {
             c.drifting = false;
             if (c.charge > 0.45) {
-              c.boostT = (c.charge > 1 ? 0.9 : 0.55) * (1 + 0.5 * c.st.split);
+              c.boostT = (c.charge > 1 ? 0.9 : 0.55) * (1 + 0.5 * c.st.gun.split);
               sound.sfx('dash'); fx.burst(c.x, c.y, 8, '#ffd84a', { speed: 80, life: 0.3 });
-              if (c.st.aftershock) {
-                const R = 22 + 8 * c.st.aftershock;
+              if (c.st.blockShock) {
+                const R = 22 + 8 * c.st.blockShock;
                 fx.ring(c.x, c.y, R, '#ffd84a', 0.35); sound.sfx('boom');
                 for (const o of cars) {
                   if (o === c || o.hopT > 0 || o.braceT > 0) continue;
@@ -227,9 +237,13 @@ export function create(ctx) {
             c.charge = 0;
           }
         }
-        if (k.fireP && c.hopCd <= 0 && c.hopT <= 0) { c.hopT = c.hopMax; c.hopCd = 1.8 * c.st.fireCd; sound.sfx('jump'); fx.dust(c.x, c.y, '#d9b48a', 5); }
-        if (k.blockP && c.braceCd <= 0) { c.braceT = 1; c.braceCd = 4 * c.st.blockCd; sound.sfx('block'); }
-        let top = 98 * c.st.speed;
+        if (k.blockP && c.hopCd <= 0 && c.hopT <= 0) {
+          c.hopT = c.hopMax; c.hopCd = 1.8 * c.st.blockCd; sound.sfx('jump'); fx.dust(c.x, c.y, '#d9b48a', 5);
+          if (c.st.blockBlink) { c.x += Math.cos(c.ang) * 30; c.y += Math.sin(c.ang) * 30; fx.burst(c.x, c.y, 8, '#fff', { speed: 50, life: 0.3 }); }
+        }
+        const aim = k.aim ? Math.atan2(k.ay, k.ax) : c.ang;
+        guns.trigger(c, c.gs, c.st.gun, k.fire && !c.finished, aim, c.x + Math.cos(aim) * 7, c.y + Math.sin(aim) * 7, dt);
+        let top = 98 * c.st.speed * (c.slowT > 0 ? 0.6 : 1);
         if (!track && c.hopT <= 0) top *= 0.5;
         if (c.boostT > 0) top *= 1.5;
         if (c.st.magnet) for (const o of cars) {
@@ -240,7 +254,8 @@ export function create(ctx) {
         c.speed += (c.speed < top ? 150 : -90) * dt;
         if (Math.abs(c.speed - top) < 3) c.speed = top;
       }
-      const grip = c.drifting ? 2.4 : c.spinT > 0 ? 1 : 9;
+      const grip = (c.drifting ? 2.4 : c.spinT > 0 ? 1 : 9) * (env.ice ? 0.3 : 1);
+      c.vx += env.wind * 0.5 * dt;
       c.vx = lerp(c.vx, Math.cos(c.ang) * c.speed, Math.min(1, grip * dt));
       c.vy = lerp(c.vy, Math.sin(c.ang) * c.speed, Math.min(1, grip * dt));
       c.x += c.vx * dt; c.y += c.vy * dt;
@@ -281,12 +296,12 @@ export function create(ctx) {
       a.x -= nx * push; a.y -= ny * push; b.x += nx * push; b.y += ny * push;
       const rel = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
       const base = 40 + Math.max(0, rel) * 0.8;
-      if (b.braceT <= 0) { b.vx += nx * base * a.st.knock * b.st.knockTaken; b.vy += ny * base * a.st.knock * b.st.knockTaken; }
-      if (a.braceT <= 0) { a.vx -= nx * base * b.st.knock * a.st.knockTaken; a.vy -= ny * base * b.st.knock * a.st.knockTaken; }
+      b.vx += nx * base * a.st.gun.knock * b.st.knockTaken; b.vy += ny * base * a.st.gun.knock * b.st.knockTaken;
+      a.vx -= nx * base * b.st.gun.knock * a.st.knockTaken; a.vy -= ny * base * b.st.gun.knock * a.st.knockTaken;
       if (a.bumpCd <= 0 || b.bumpCd <= 0) {
         sound.sfx('bump'); fx.burst(a.x + nx * a.r, a.y + ny * a.r, 5, '#fff6a8', { speed: 60, life: 0.2 }); fx.shake(0.08);
-        if (a.st.dmg > 1 && b.braceT <= 0) spinOut(b, 'SMASH!');
-        if (b.st.dmg > 1 && a.braceT <= 0) spinOut(a, 'SMASH!');
+        if (a.st.size > 1.2) spinOut(b, 'SMASH!');
+        if (b.st.size > 1.2) spinOut(a, 'SMASH!');
         a.bumpCd = b.bumpCd = 0.4;
       }
     }
@@ -311,6 +326,8 @@ export function create(ctx) {
       }
     }
 
+    guns.update(dt);
+    pickups.update(dt, cars.map((c) => ({ p: c, x: c.x, y: c.y, r: c.r + 2, mult: c.mult })));
     const allDone = cars.every((c) => c.finished);
     if (endT === null && (allDone || (deadline !== null && t >= deadline) || t >= TIME)) endT = 1.0;
     if (endT !== null) {
@@ -336,6 +353,21 @@ export function create(ctx) {
   };
   Object.defineProperty(game, 'timeLeft', { get: () => (deadline !== null ? Math.max(0, deadline - t) : Math.max(0, TIME - t)) });
   game.players = cars;
+  const guns = new Guns({
+    twist: tw,
+    bounds: { x0: 0, y0: 15, x1: 320, y1: 180, open: {} },
+    accel: () => [env.wind * 0.6, 0],
+    solidAt: (x, y) => { for (const k of cacti) if (Math.hypot(k.x - x, k.y - y) < k.r) return { circle: k }; return null; },
+    targets: () => cars.filter((c) => c.hopT <= 0).map((c) => ({ ref: c, owner: c, x: c.x, y: c.y, r: c.r })),
+    onHit: (c, info) => {
+      if (c.hopT > 0) return 'none';
+      c.vx += info.dx * 90 * (info.g.knock || 1) * c.st.knockTaken; c.vy += info.dy * 90 * (info.g.knock || 1) * c.st.knockTaken;
+      if (info.g.frost) c.slowT = 1.5;
+      if (info.dmg >= 25) spinOut(c, 'BLASTED!'); else { c.speed *= 0.6; c.flashT = 0.1; }
+      return 'hit';
+    },
+  }, fx, sound);
+  const pickups = new Pickups({ fx, sound, types: ['rapid', 'mega', 'shield', 'speed', 'bounce'], spot: () => { const s = T.sm[Math.floor(rand(0, T.sm.length))]; return [s[0], s[1]]; } });
 
   game.draw = (g) => {
     if (T.img) g.c.drawImage(T.img, g.ox * S, g.oy * S);
@@ -375,6 +407,8 @@ export function create(ctx) {
       for (let k = 0; k < 10; k++) { const a = w.rot + k * 2.4; g.rect(w.x + Math.cos(a) * w.r * (k % 3) / 2, w.y + Math.sin(a) * w.r * (k % 3) / 2, 1, 1, k % 2 ? '#8a6a3a' : '#c09a5a'); }
       g.ring(w.x, w.y, w.r, '#9a7a4a');
     }
+    pickups.draw(g);
+    guns.draw(g);
     for (const c of cars) {
       const a = art(c.idx);
       const lift = c.hopT > 0 ? Math.sin((c.hopT / c.hopMax) * Math.PI) * 7 : 0;
@@ -388,6 +422,7 @@ export function create(ctx) {
       g.text(`P${c.idx + 1}`, c.x, c.y - lift - 12.5, { scale: 1, col: SEAT_COLORS[c.idx], align: 'center', ui: false, shadow: null });
       if (c.wrongT > 0.8 && Math.floor(t * 6) % 2) g.text('WRONG WAY!', c.x, c.y + 8, { scale: 1, col: '#ff5a5a', align: 'center', ui: false });
       if (c.hopCd <= 0 && !c.finished) g.rect(c.x - 1, c.y + c.r + 3, 2, 1, '#fff');
+      drawBuffs(g, c, c.x, c.y - lift - 16);
     }
     // dusk tint
     g.alpha(0.12); g.rect(0, 0, 320, 180, '#5a1a6a', true); g.alpha(1);

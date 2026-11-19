@@ -54,3 +54,39 @@
 
 ## Points
 Each event gives 1st/2nd/3rd place 3/2/1 points. A match is 8 events (4 games × 2).
+
+---
+
+# Build 3: ROUNDS-style guns, physics twists, three new games
+
+## What makes ROUNDS' gun physics fun (research notes)
+- **Bullets are physical objects.** They fall with gravity, carry knockback, and bounce off walls once you have bounce cards. A bad angle can still be a good shot.
+- **Gun cards change numbers with clear trade-offs.** Examples: *Bouncy* gives +2 bounces and +25% damage but +0.25 s reload. *Mayhem* gives +5 bounces but -15% damage and +0.5 s reload. *Trickster* adds 2 bounces where each bounce adds +80% damage, but -20% base damage. *Buckshot* gives +4 bullets and +5 ammo but -60% damage. *Explosive Bullet* explodes on impact but slows your attack speed.
+- **Ammo and reload are a rhythm.** You empty a magazine, then you're open while you reload. Cards trade damage against fire rate against reload.
+- **Cards multiply each other.** Bounces × split × homing × explosions is where the stories come from.
+- **Block is a skill with its own cards:** shockwave blocks, teleport blocks, healing blocks.
+- **Rarity** (common / uncommon / rare) keeps the wildest cards special.
+
+## Our gun system (`src/game/weapons.js`), shared by every game with a gun
+Each player's gun has: damage, pellets, spread, bullet speed, bullet gravity, bullet size, ammo, reload, shot delay, burst count, bounces, damage per bounce, homing, retarget on bounce, explosion radius, sticky fuse, split on bounce, speed-up in flight, wave, knockback, lifesteal, poison, frost, phase-through-walls, and boomerang.
+Bullets are moved in sub-steps so fast bullets don't skip thin ledges. They bounce off solid ground, round planets and the arena's edges. Gravity comes from the game, so in Orbit Outpost bullets curve around the planet.
+
+## 30 original power cards in 3 rarities
+Gun cards, body cards and block cards, each with ROUNDS-style +/- lines. The card also says where it applies in the next game: your gun, your turret, your car's blaster, your block, or your dash. Each card stacks to 2×.
+
+## Physics twists (8Bit Fiesta-style rule changes)
+From the 2nd event on, each event has a 50% chance of a twist, shown on the intro screen. Moon Gravity, Heavy Metal, Crosswind, Tilt-a-Whirl (gravity swings), Rubber World (+3 bounces on every bullet), Bullet Time, Big Head Mode, Warp Edges (bullets wrap around the screen), Hyper Speed and Ice Rink. Each game only uses the twists that make sense for it.
+
+## Color drift
+The whole screen slowly shifts hue, and the shift kicks harder on knockouts. **SUBTLE** is the default, **WILD** adds stronger color plus light trails, and **OFF** turns it off (Y on the title screen, X in pause). Players are still told apart by shape, pattern and number, so color drift never hides who is who.
+
+## Three new minigames
+5. **Orbit Outpost.** A tiny planet with its own gravity. Run all the way around it, and bullets curve into orbits. Dodge two moons, marked meteor strikes and fire geysers. Knocked-out players become satellites and shoot down at the planet.
+6. **Blast Ball.** Top-down pinball soccer. Each player guards a goal. Shoot the ball (bullet knockback pushes it), dash into it, and bank it off bumpers. Three goals against you and you're out, and your goal becomes a wall you ride as a turret. Multiball at 20 s.
+7. **Splat City.** Top-down paint war. Bullets paint the streets as they fly and splat where they land, so bounces paint more. Shooting a rival splats paint around them. Street sweepers and a rotating sprinkler wash paint away. Most of the map painted wins. Each player's paint has its own pattern.
+
+## Ricochet Rooftop maps
+Five arenas: Neon Roofs, Water Tower, Billboard, Crane Yard and Staircase.
+
+## Match length
+7 games. A match plays 8 events: every game once plus one repeat, shuffled with no back-to-back repeats.

@@ -1,45 +1,45 @@
 // Match rules: playlist, points, comeback drafts, stacking, ties, rematch.
 // No DOM, no rendering. Tested in tests/game-tests.js.
-import { POWERS, MAX_STACK, statsFor } from './powers.js';
+import { POWERS, MAX_STACK, statsFor, RARITY, MAX_TIPSY } from './powers.js';
 import { shuffle } from '../engine/util.js';
 
 export const POINTS = [3, 2, 1];
 
-/** Each game `perGame` times, shuffled, never the same game twice in a row. */
-export function makePlaylist(ids, perGame = 2, rng = Math.random) {
-  const pool = ids.flatMap((id) => Array(perGame).fill(id));
-  for (let tries = 0; tries < 200; tries++) {
-    const p = shuffle(pool, rng);
-    if (p.every((g, i) => i === 0 || g !== p[i - 1])) return p;
+/**
+ * A playlist of `total` events: every game once (as far as `total` allows),
+ * then repeats, at most `perGame` of each, never the same game twice in a row.
+ */
+export function makePlaylist(ids, perGame = 2, rng = Math.random, total = null) {
+  total = total || ids.length * perGame;
+  const ok = (p) => p.every((g, i) => i === 0 || g !== p[i - 1]);
+  for (let tries = 0; tries < 400; tries++) {
+    const first = shuffle(ids, rng).slice(0, Math.min(total, ids.length));
+    const extraPool = shuffle(ids.flatMap((id) => Array(perGame - 1).fill(id)), rng);
+    const p = shuffle([...first, ...extraPool.slice(0, total - first.length)], rng);
+    if (p.length === total && ok(p)) return p;
   }
-  // Greedy fallback: always take the most common game that isn't the last one.
-  const left = {}; pool.forEach((g) => { left[g] = (left[g] || 0) + 1; });
   const out = [];
-  while (out.length < pool.length) {
-    const opts = Object.keys(left).filter((g) => left[g] > 0 && g !== out[out.length - 1])
-      .sort((a, b) => left[b] - left[a]);
-    const g = opts[0] || Object.keys(left).find((k) => left[k] > 0);
-    out.push(g); left[g]--;
-  }
+  for (let i = 0; i < total; i++) out.push(ids[i % ids.length]);
   return out;
 }
 
 export class Match {
-  constructor(seats, gameIds, { perGame = 2, rng = Math.random } = {}) {
+  constructor(seats, gameIds, { perGame = 2, rng = Math.random, total = null } = {}) {
     this.seats = seats.slice();
     this.gameIds = gameIds;
     this.perGame = perGame;
+    this.total = total;
     this.rng = rng;
     this.reset();
   }
   reset() {
-    this.players = this.seats.map((seat) => ({ seat, points: 0, wins: 0, powers: {}, places: [] }));
-    this.playlist = makePlaylist(this.gameIds, this.perGame, this.rng);
+    this.players = this.seats.map((seat) => ({ seat, points: 0, wins: 0, powers: {}, places: [], tipsy: 0 }));
+    this.playlist = makePlaylist(this.gameIds, this.perGame, this.rng, this.total);
     this.eventIdx = 0;
     this.suddenDeath = null;
   }
   player(seat) { return this.players.find((p) => p.seat === seat); }
-  stats(seat) { return statsFor(this.player(seat).powers); }
+  stats(seat) { const p = this.player(seat); return statsFor(p.powers, { tipsy: p.tipsy }); }
   get current() { return this.suddenDeath ? 'rumble' : this.playlist[this.eventIdx]; }
   get next() { return this.playlist[this.eventIdx + 1] || null; }
   get isLast() { return this.eventIdx >= this.playlist.length - 1; }
@@ -53,7 +53,9 @@ export class Match {
       p.points += pts;
       p.places.push(i + 1);
       if (i === 0) p.wins += 1;
-      return { seat, place: i + 1, pts };
+      // Winner's Curse: winners get tipsier, everyone else sobers up a level.
+      p.tipsy = i === 0 ? Math.min(MAX_TIPSY, p.tipsy + 1) : Math.max(0, p.tipsy - 1);
+      return { seat, place: i + 1, pts, tipsy: p.tipsy };
     });
     this.lastRanking = ranking.slice();
     return out;
@@ -68,8 +70,16 @@ export class Match {
   /** Three different powers this seat can still take. */
   offer(seat, n = 3) {
     const p = this.player(seat);
-    const avail = POWERS.filter((pw) => (p.powers[pw.id] || 0) < MAX_STACK);
-    return shuffle(avail, this.rng).slice(0, n).map((pw) => pw.id);
+    let avail = POWERS.filter((pw) => (p.powers[pw.id] || 0) < MAX_STACK);
+    const out = [];
+    while (out.length < n && avail.length) {
+      const total = avail.reduce((a, pw) => a + RARITY[pw.rarity].weight, 0);
+      let r = this.rng() * total;
+      const pick = avail.find((pw) => (r -= RARITY[pw.rarity].weight) <= 0) || avail[avail.length - 1];
+      out.push(pick.id);
+      avail = avail.filter((pw) => pw !== pick);
+    }
+    return out;
   }
   pick(seat, id) {
     const p = this.player(seat);
@@ -78,6 +88,8 @@ export class Match {
     return true;
   }
   advance() { this.eventIdx += 1; }
+  /** 0 = leading … n-1 = last, by points then wins. */
+  rankIndex(seat) { return this.standings().findIndex((p) => p.seat === seat); }
 
   /** Sorted by points, then event wins. */
   standings() {

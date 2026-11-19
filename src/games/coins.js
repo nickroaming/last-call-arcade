@@ -2,20 +2,26 @@
 import { TAU, clamp, rand, overlap, circleRect } from '../engine/util.js';
 import { drawPlayer, drawTag, SEAT_COLORS } from '../engine/sprites.js';
 import { makeBody, platformControl, stepBody, moveMovers } from './platformer.js';
+import { Guns, newGunState } from '../game/weapons.js';
+import { twistEnv } from '../game/twists.js';
+import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 
 export const meta = {
   id: 'coins', name: 'COIN STORM', color: '#ffd84a', music: 'coins',
   tagline: "It's raining money",
-  objective: 'Grab the most coins. Stomp heads and shove rivals to knock coins loose.',
-  controls: [['STICK', 'Move'], ['A', 'Jump (double jump)'], ['X', 'Shove'], ['RB', 'Block']],
+  objective: 'Grab the most coins. Shoot rivals and stomp their heads to knock coins loose.',
+  controls: [['STICK', 'Move and aim'], ['A', 'Jump (double jump)'], ['X / RT', 'Shoot: hits knock coins loose'], ['RB', 'Block']],
   hazards: 'Lightning strikes / rolling barrels / a swinging spike ball / moving platforms',
   ghost: 'Nobody is knocked out. Lose coins, not your place in the game',
   tiebreak: 'More coins > reached that total first',
+  gunUse: 'Your gun (hits knock coins loose)', blockUse: 'Your block (RB)', bodyUse: 'Your body',
+  twists: ['moon', 'heavy', 'wind', 'tilt', 'rubber', 'giant', 'ice', 'warp'],
 };
 const TIME = 30;
 
 export function create(ctx) {
-  const fx = ctx.fx, sound = ctx.sound;
+  const fx = ctx.fx, sound = ctx.sound, tw = ctx.twist || null;
+  let env = twistEnv(tw, 0);
   const flip = ctx.variant % 2 === 1;
   const fl = (o) => (flip ? { ...o, x: 320 - o.x - o.w } : o);
   const solids = [
@@ -33,10 +39,12 @@ export function create(ctx) {
   const players = ctx.players.map((pl, i) => {
     const st = pl.stats;
     const w = 8 * st.size, h = 11 * st.size;
-    return {
-      seat: pl.seat, idx: pl.idx, st, b: makeBody(70 + i * 90, 150, w, h), coins: 0, lastGain: 0,
-      face: 1, shoveCd: 0, shoveT: 0, blockT: 0, blockCd: 0, shields: st.shields, stunT: 0, inv: 0, flashT: 0,
+    const p = {
+      seat: pl.seat, idx: pl.idx, b: makeBody(70 + i * 90, 150, w, h), coins: 0, lastGain: 0, mult: pl.pickupMult ?? 1,
+      face: 1, gs: newGunState(st.gun), blockT: 0, blockCd: 0, shields: st.shields, stunT: 0, inv: 0, flashT: 0, slowT: 0,
     };
+    p.pos = () => [p.b.x + p.b.w / 2, p.b.y + p.b.h / 2];
+    return makeBuffable(p, st);
   });
   const coins = [];
   const barrels = [];
@@ -45,6 +53,23 @@ export function create(ctx) {
   let coinT = 0, jackT = 7, boltT = 3, barrelT = 4;
   let t = 0, endT = null;
   const game = { meta, finished: false, ranking: [], players };
+  const guns = new Guns({
+    twist: tw,
+    bounds: { x0: 0, y0: 14, x1: 320, y1: 180, open: {} },
+    accel: () => [140 * env.bulletGrav * env.gx + env.wind, 140 * env.bulletGrav * env.gy],
+    solidAt: (x, y) => { for (const q of all) if (x >= q.x && x <= q.x + q.w && y >= q.y && y <= q.y + q.h) return { rect: q }; return null; },
+    targets: () => players.map((p) => ({ ref: p, owner: p, rect: p.b, r: p.b.w / 2 })),
+    onHit: (p, info) => {
+      if (p.blockT > 0) { if (p.st.reflect && info.kind === 'bullet') return 'reflect'; fx.ring(p.b.x + p.b.w / 2, p.b.y + p.b.h / 2, 12, '#9ff'); sound.sfx('block'); return 'blocked'; }
+      const k = 170 * (info.g.knock || 1);
+      knock(p, info.dx * k, info.dy * k * 0.6 - 90);
+      if (info.g.frost) p.slowT = 1.5;
+      p.flashT = 0.1;
+      if (p.inv <= 0) loseCoins(p, Math.max(1, Math.round(info.dmg / 34)));
+      return 'hit';
+    },
+  }, fx, sound);
+  const pickups = new Pickups({ fx, sound, types: ['rapid', 'mega', 'shield', 'speed', 'bounce'], spot: () => { const q = solids[Math.floor(rand(0, solids.length))]; return [clamp(q.x + rand(8, q.w - 8), 10, 310), q.y - 8]; } });
 
   function dropCoin(x, y, value = 1, burst = false) {
     coins.push({ x, y, vx: burst ? rand(-90, 90) : rand(-10, 10), vy: burst ? rand(-180, -80) : 0, r: value > 1 ? 4 : 2.5, value, life: 9, grabDelay: burst ? 0.4 : 0, rot: rand(0, 6) });
@@ -68,7 +93,7 @@ export function create(ctx) {
   }
   function shockwave(p) {
     const cx = p.b.x + p.b.w / 2, cy = p.b.y + p.b.h;
-    const R = 20 + 8 * p.st.aftershock;
+    const R = 22 + 8 * (p.st.blockShock || 1);
     fx.ring(cx, cy, R, '#ffd84a', 0.3); sound.sfx('boom');
     for (const o of players) {
       if (o === p) continue;
@@ -80,6 +105,7 @@ export function create(ctx) {
 
   game.update = (dt, controls) => {
     t += dt;
+    env = { ...twistEnv(tw, t), ice: tw && tw.ice };
     moveMovers(movers, t);
     // coin rain
     coinT -= dt;
@@ -106,7 +132,7 @@ export function create(ctx) {
       if (c.grabDelay <= 0) for (const p of players) {
         if (!circleRect(c.x, c.y, c.r + 1, p.b)) continue;
         let v = c.value;
-        if (p.st.split && Math.random() < 0.25 * p.st.split) { v *= 2; fx.popup('x2', c.x, c.y - 6, '#c6ff5a', 1); }
+        if (p.st.gun.split && Math.random() < 0.25 * p.st.gun.split) { v *= 2; fx.popup('x2', c.x, c.y - 6, '#c6ff5a', 1); }
         p.coins += v; p.lastGain = t;
         sound.sfx(c.value > 1 ? 'jackpot' : 'coin');
         fx.burst(c.x, c.y, c.value > 1 ? 14 : 4, '#ffd84a', { speed: 50, life: 0.3 });
@@ -175,39 +201,27 @@ export function create(ctx) {
     // players
     for (const p of players) {
       const c = controls.get(p.seat);
-      p.inv -= dt; p.flashT -= dt; p.shoveCd -= dt; p.shoveT -= dt; p.blockT -= dt; p.blockCd -= dt;
-      const ctl = p.stunT > 0 ? { ...c, mx: 0, jumpP: false, jump: false } : c;
+      tickBuffs(p, dt);
+      p.inv -= dt; p.flashT -= dt; p.blockT -= dt; p.blockCd -= dt; p.slowT -= dt;
+      const ctl = p.stunT > 0 ? { ...c, mx: 0, jumpP: false, jump: false, fire: false } : c;
       p.stunT -= dt;
-      const ev = platformControl(p.b, ctl, p.st, dt);
+      p.b.slowT = p.slowT;
+      const ev = platformControl(p.b, ctl, p.st, dt, env);
       if (ev) { sound.sfx('jump'); fx.dust(p.b.x + p.b.w / 2, p.b.y + p.b.h, '#8a8aa8'); }
       if (Math.abs(c.mx) > 0.2) p.face = Math.sign(c.mx);
-      if (c.blockP && p.blockCd <= 0) { p.blockT = 0.35; p.blockCd = 2.4 * p.st.blockCd; sound.sfx('block'); }
-      if (c.fireP && p.shoveCd <= 0 && p.stunT <= 0) {
-        p.shoveCd = 0.75 * p.st.fireCd; p.shoveT = 0.15; sound.sfx('shove');
-        // homing lunge
-        if (p.st.homing) {
-          let best = null, bd = 60;
-          for (const o of players) { if (o === p) continue; const d = Math.abs(o.b.x - p.b.x) + Math.abs(o.b.y - p.b.y); if (d < bd) { bd = d; best = o; } }
-          if (best) { p.face = Math.sign(best.b.x - p.b.x) || p.face; p.b.vx = p.face * 220; p.b.stun = 0.12; }
-        }
-        const reach = 13 * p.st.size + 3 * p.st.spread;
-        const box = { x: p.face > 0 ? p.b.x + p.b.w - 2 : p.b.x - reach + 2, y: p.b.y - 3 * p.st.spread, w: reach, h: p.b.h + 6 * p.st.spread };
-        fx.burst(p.b.x + p.b.w / 2 + p.face * 8, p.b.y + p.b.h / 2, 5, '#fff', { speed: 70, life: 0.15, angle: p.face > 0 ? 0 : Math.PI, spread: 1 });
-        let hitAny = false;
-        for (const o of players) {
-          if (o === p || !overlap(box, o.b)) continue;
-          hitAny = true;
-          knock(o, p.face * 210 * p.st.knock, -130);
-          loseCoins(o, Math.round(2 * p.st.dmg));
-        }
-        if (hitAny) { fx.stop(0.04); if (p.st.aftershock) shockwave(p); }
+      if (c.blockP && p.blockCd <= 0) {
+        p.blockT = 0.35; p.blockCd = 2.4 * p.st.blockCd; sound.sfx('block');
+        if (p.st.blockShock) shockwave(p);
+        if (p.st.blockBlink) { p.b.x = clamp(p.b.x + (Math.abs(c.mx) > 0.3 ? Math.sign(c.mx) : p.face) * 46, 0, 312); fx.burst(p.b.x, p.b.y, 10, '#fff', { speed: 50, life: 0.3 }); }
       }
+      let a;
+      if (c.aim) a = Math.atan2(c.ay, c.ax);
+      else if (Math.hypot(c.mx, c.my) > 0.4) a = Math.atan2(c.my, c.mx);
+      else a = p.face > 0 ? 0 : Math.PI;
+      const [gx, gy] = p.pos();
+      guns.trigger(p, p.gs, p.st.gun, ctl.fire, a, gx + Math.cos(a) * 5, gy + Math.sin(a) * 5, dt);
       stepBody(p.b, dt, all);
       if (p.b.landed) fx.dust(p.b.x + p.b.w / 2, p.b.y + p.b.h, '#8a8aa8');
-      if (p.st.bounces && p.b.hitWallX && Math.abs(p.b.wallSpeed) > 60) {
-        p.b.vx = -p.b.hitWallX * (130 + 30 * p.st.bounces); p.b.vy = Math.min(p.b.vy, -120); p.b.stun = 0.2;
-        fx.burst(p.b.x + (p.b.hitWallX > 0 ? p.b.w : 0), p.b.y + p.b.h / 2, 5, '#7dff8a', { speed: 50, life: 0.2 }); sound.sfx('boing');
-      }
       if (p.b.y > 190) { p.b.y = 150; p.b.vy = 0; }
     }
     // stomps
@@ -218,9 +232,11 @@ export function create(ctx) {
         p.b.vy = -230; p.b.jumps = 1;
         o.stunT = 0.5; o.b.squash = 1;
         if (loseCoins(o, 3)) fx.popup('STOMP!', o.b.x + o.b.w / 2, o.b.y - 8, '#fff', 1);
-        if (p.st.aftershock) shockwave(p);
+        if (p.st.blockShock) shockwave(p);
       }
     }
+    guns.update(dt);
+    pickups.update(dt, players.map((p) => { const [x, y] = p.pos(); return { p, x, y, r: p.b.w / 2 + 2, mult: p.mult }; }));
 
     if (endT === null && t >= TIME) endT = 0.8;
     if (endT !== null) {
@@ -279,12 +295,14 @@ export function create(ctx) {
       g.rect(br.x - br.r, br.y - 1, br.r * 2, 2, '#5a3a1a');
       g.rect(br.x + Math.cos(br.rot) * 4 - 1, br.y + Math.sin(br.rot) * 4 - 1, 2, 2, '#c08a4a');
     }
+    pickups.draw(g);
+    guns.draw(g);
     // players
     for (const p of players) {
       const cx = p.b.x + p.b.w / 2;
       const blink = p.inv > 0 && Math.floor(t * 16) % 2;
       drawPlayer(g, p.idx, cx, p.b.y + p.b.h, { flip: p.face < 0, size: p.st.size, flash: p.flashT > 0, alpha: blink ? 0.5 : 1, squash: p.b.squash });
-      if (p.shoveT > 0) { g.rect(cx + p.face * 6, p.b.y + p.b.h * 0.4, p.face * 8 * p.st.size, 3, '#fff'); }
+      drawBuffs(g, p, cx, p.b.y - 24);
       if (p.blockT > 0) g.ring(cx, p.b.y + p.b.h / 2, 10 * p.st.size, '#9ff');
       if (p.stunT > 0) for (let k = 0; k < 3; k++) { const a = t * 8 + k * 2; g.rect(cx + Math.cos(a) * 5, p.b.y - 4 + Math.sin(a) * 2, 1, 1, '#ffd84a'); }
       if (p.shields) g.ring(cx, p.b.y + p.b.h / 2, 8 * p.st.size, '#9fd3ff55');

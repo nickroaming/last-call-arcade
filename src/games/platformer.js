@@ -18,11 +18,12 @@ export function moveMovers(movers, t) {
 }
 
 /** Apply stick and jump input. Returns 'jump' | 'djump' | null. */
-export function platformControl(b, c, st, dt) {
-  const max = 92 * st.speed;
+export function platformControl(b, c, st, dt, env = null) {
+  const max = 92 * st.speed * (b.slowT > 0 ? 0.55 : 1);
+  const ice = env && env.ice;
   if (b.stun > 0) b.stun -= dt;
-  else b.vx = approach(b.vx, c.mx * max, (b.onGround ? 1100 : 750) * dt);
-  if (b.onGround) { b.coyote = 0.1; b.jumps = 1; } else b.coyote -= dt;
+  else b.vx = approach(b.vx, c.mx * max, (b.onGround ? (ice ? 200 : 1100) : (ice ? 420 : 750)) * dt);
+  if (b.onGround) { b.coyote = 0.1; b.jumps = st.airJumps ?? 1; } else b.coyote -= dt;
   b.buffer = c.jumpP ? 0.12 : b.buffer - dt;
   b.dropT -= dt;
   if (c.jumpP && c.my > 0.6 && b.onGround && b.ground && b.ground.oneWay) {
@@ -35,7 +36,8 @@ export function platformControl(b, c, st, dt) {
     else if (b.jumps > 0) { b.jumps -= 1; b.vy = -v * 0.88; ev = 'djump'; }
     if (ev) { b.coyote = 0; b.buffer = 0; b.squash = -0.8; b.onGround = false; }
   }
-  b.gravMult = st.grav * (b.vy < 0 && !c.jump ? 2.1 : 1) * (c.my > 0.6 && b.vy > 0 ? 1.4 : 1);
+  b.gravMult = st.grav * (env ? env.grav * env.gy : 1) * (b.vy < 0 && !c.jump ? 2.1 : 1) * (c.my > 0.6 && b.vy > 0 ? 1.4 : 1);
+  b.sideAcc = env ? GRAV * env.grav * env.gx * 0.6 + env.wind * 0.8 : 0;
   return ev;
 }
 
@@ -46,6 +48,7 @@ export function stepBody(b, dt, solids, worldW = 320) {
   b.vy = Math.min(430, b.vy + GRAV * (b.gravMult ?? 1) * dt);
   b.squash *= Math.pow(0.0005, dt);
 
+  if (b.sideAcc) b.vx += b.sideAcc * dt * (b.onGround ? 0.5 : 1);
   b.hitWallX = 0;
   b.x += b.vx * dt;
   for (const s of solids) {

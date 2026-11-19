@@ -1,6 +1,9 @@
 // LASER LOUNGE: top-down survival on a neon dance floor. Dodge everything.
 import { TAU, clamp, rand, segDist, angleDiff, approach } from '../engine/util.js';
 import { drawPlayer, drawTag, SEAT_COLORS } from '../engine/sprites.js';
+import { Guns, newGunState } from '../game/weapons.js';
+import { twistEnv } from '../game/twists.js';
+import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 
 export const meta = {
   id: 'lounge', name: 'LASER LOUNGE', color: '#ff5fd2', music: 'lounge',
@@ -10,6 +13,8 @@ export const meta = {
   hazards: 'Spinning lasers / laser walls with a gap / zapping floor tiles / bouncing disco balls',
   ghost: 'Out of hearts: ride the walls as a turret and shoot orbs at the survivors',
   tiebreak: 'Standing > more hearts > knocked out later',
+  gunUse: 'Your turret gun when you are out', blockUse: 'Your dash (A)', bodyUse: 'Your body (health = hearts)',
+  twists: ['wind', 'giant', 'hyper', 'ice', 'rubber', 'warp'],
 };
 
 const TOP = 16, BOT = 180, LEFT = 0, RIGHT = 320;
@@ -34,21 +39,32 @@ const SCRIPT = [
 ];
 
 export function create(ctx) {
-  const fx = ctx.fx, sound = ctx.sound;
+  const fx = ctx.fx, sound = ctx.sound, tw = ctx.twist || null;
+  let env = twistEnv(tw, 0);
   const per = 2 * ((RIGHT - LEFT) + (BOT - TOP));
   const players = ctx.players.map((pl, i) => {
     const st = pl.stats;
-    const hearts = st.hp;
+    const hearts = clamp(Math.round(st.hp / 34), 1, 6);
     const out = !!pl.ghost;
-    return {
-      seat: pl.seat, idx: pl.idx, st, x: 110 + i * 50, y: 110, vx: 0, vy: 0, r: 3.6 * st.size,
+    const p = {
+      seat: pl.seat, idx: pl.idx, x: 110 + i * 50, y: 110, vx: 0, vy: 0, r: 3.6 * st.size, gs: newGunState(st.gun), mult: pl.pickupMult ?? 1, slowT: 0,
       hearts: out ? 0 : hearts, maxHearts: hearts, shields: st.shields, inv: 1, out, outT: out ? -1 : null,
       dashT: 0, dashCd: 0, dashDx: 1, dashDy: 0, face: 1, flashT: 0,
       tur: { s: (i / 3) * per + 40, cd: 1.2 },
     };
+    p.pos = () => (p.out ? [perimeterPos(p.tur.s).x, perimeterPos(p.tur.s).y] : [p.x, p.y - 4]);
+    return makeBuffable(p, st);
   });
   const hazards = [];
-  const orbs = [];
+  const guns = new Guns({
+    twist: tw,
+    bounds: { x0: 0, y0: TOP, x1: 320, y1: BOT, open: {} },
+    accel: () => [env.wind, 0],
+    solidAt: () => null,
+    targets: () => players.filter((p) => !p.out).map((p) => ({ ref: p, owner: p, x: p.x, y: p.y - 4, r: p.r })),
+    onHit: (p, info) => { if (p.out || p.inv > 0) return 'none'; if (info.g.frost) p.slowT = 1.5; hurt(p, p.x - info.dx * 5, p.y - info.dy * 5); return 'hit'; },
+  }, fx, sound);
+  const pickups = new Pickups({ fx, sound, types: ['shield', 'speed'], every: 6, spot: () => [rand(20, 300), rand(TOP + 15, BOT - 10)] });
   let script = SCRIPT.map((s) => ({ t: s[0], type: s[1], opts: s[2], label: s[3] }));
   let t = 0, endT = null;
   const game = { meta, finished: false, ranking: [], players };
@@ -123,6 +139,7 @@ export function create(ctx) {
 
   game.update = (dt, controls) => {
     t += dt;
+    env = { ...twistEnv(tw, t), ice: tw && tw.ice };
     while (script.length && script[0].t <= t) {
       const s = script.shift();
       spawn(s.type, s.opts);
@@ -172,41 +189,39 @@ export function create(ctx) {
         const q = perimeterPos(p.tur.s);
         p.tur.s += (c.mx * q.tx + c.my * q.ty) * 130 * dt;
         p.tur.cd -= dt;
-        if (c.fireP && p.tur.cd <= 0 && endT === null) {
-          const q2 = perimeterPos(p.tur.s);
-          let a = c.aim ? Math.atan2(c.ay, c.ax) : Math.atan2(q2.ny, q2.nx);
-          if (!c.aim && Math.hypot(c.mx, c.my) > 0.5) a = Math.atan2(q2.ny, q2.nx) + clamp(angleDiff(Math.atan2(q2.ny, q2.nx), Math.atan2(c.my, c.mx)), -1, 1) * 0.6;
-          const n = 1 + p.st.spread;
-          for (let k = 0; k < n; k++) {
-            const aa = a + (k - (n - 1) / 2) * 0.3;
-            orbs.push({ x: q2.x + q2.nx * 4, y: q2.y + q2.ny * 4, vx: Math.cos(aa) * 78 * p.st.bulletSpeed, vy: Math.sin(aa) * 78 * p.st.bulletSpeed, r: p.st.dmg >= 2 ? 5 : p.st.dmg < 1 ? 2.5 : 3.2, owner: p, bounces: p.st.bounces, split: p.st.split, homing: p.st.homing + p.st.magnet, life: 6 });
-          }
-          p.tur.cd = 1.3 * p.st.fireCd; sound.sfx('shoot');
-        }
+        const q2 = perimeterPos(p.tur.s);
+        let a = c.aim ? Math.atan2(c.ay, c.ax) : Math.atan2(q2.ny, q2.nx);
+        if (!c.aim && Math.hypot(c.mx, c.my) > 0.5) a = Math.atan2(q2.ny, q2.nx) + clamp(angleDiff(Math.atan2(q2.ny, q2.nx), Math.atan2(c.my, c.mx)), -1, 1) * 0.6;
+        p.tur.a = a;
+        if (endT === null) guns.trigger(p, p.gs, { ...p.st.gun, speed: p.st.gun.speed * 0.5, delay: Math.max(0.35, p.st.gun.delay * 1.6) }, c.fire, a, q2.x + q2.nx * 5, q2.y + q2.ny * 5, dt);
         continue;
       }
+      tickBuffs(p, dt); p.slowT -= dt;
       p.inv -= dt; p.dashCd -= dt;
-      const max = 88 * p.st.speed;
+      const max = 88 * p.st.speed * (p.slowT > 0 ? 0.55 : 1);
       if (p.dashT > 0) {
         p.dashT -= dt;
         p.vx = p.dashDx * 270; p.vy = p.dashDy * 270;
         if (Math.random() < 0.8) fx.burst(p.x, p.y - 4, 1, SEAT_COLORS[p.idx], { speed: 10, life: 0.25 });
-        if (p.dashT <= 0 && p.st.aftershock) {
-          const R = 20 + 8 * p.st.aftershock;
+        if (p.dashT <= 0 && p.st.blockShock) {
+          const R = 20 + 8 * p.st.blockShock;
           fx.ring(p.x, p.y - 4, R, '#ffd84a', 0.35); sound.sfx('boom');
           for (const o of alive()) {
             if (o === p) continue;
             const d = Math.hypot(o.x - p.x, o.y - p.y);
-            if (d < R) { o.vx += ((o.x - p.x) / (d || 1)) * 200 * p.st.knock * o.st.knockTaken; o.vy += ((o.y - p.y) / (d || 1)) * 200 * p.st.knock * o.st.knockTaken; }
+            if (d < R) { o.vx += ((o.x - p.x) / (d || 1)) * 200 * p.st.gun.knock * o.st.knockTaken; o.vy += ((o.y - p.y) / (d || 1)) * 200 * p.st.gun.knock * o.st.knockTaken; }
           }
         }
       } else {
-        p.vx = approach(p.vx, c.mx * max, 900 * dt);
-        p.vy = approach(p.vy, c.my * max, 900 * dt);
+        const acc = env.ice ? 220 : 900;
+        p.vx = approach(p.vx, c.mx * max, acc * dt) + env.wind * 0.6 * dt;
+        p.vy = approach(p.vy, c.my * max, acc * dt);
         if (c.jumpP && p.dashCd <= 0) {
           const m = Math.hypot(c.mx, c.my);
           p.dashDx = m > 0.2 ? c.mx / m : p.face; p.dashDy = m > 0.2 ? c.my / m : 0;
           p.dashT = 0.14; p.dashCd = 1.1 * p.st.blockCd; sound.sfx('dash');
+          if (p.st.blockBlink) { p.x = clamp(p.x + p.dashDx * 40, 4, 316); p.y = clamp(p.y + p.dashDy * 40, TOP + 9, BOT - 1); fx.burst(p.x, p.y - 4, 8, '#fff', { speed: 50, life: 0.3 }); }
+          if (p.st.blockHeal && p.hearts < p.maxHearts && Math.random() < 0.15) { p.hearts += 1; fx.popup('+1', p.x, p.y - 14, '#7dff8a', 1); }
         }
       }
       if (Math.abs(c.mx) > 0.2) p.face = Math.sign(c.mx);
@@ -222,36 +237,12 @@ export function create(ctx) {
         const nx = dx / d, ny = dy / d, push = (m - d) / 2;
         a.x -= nx * push; a.y -= ny * push; b.x += nx * push; b.y += ny * push;
         const k = 60;
-        b.vx += nx * k * a.st.knock * b.st.knockTaken * (a.dashT > 0 ? 3 : 1); b.vy += ny * k * a.st.knock * b.st.knockTaken * (a.dashT > 0 ? 3 : 1);
-        a.vx -= nx * k * b.st.knock * a.st.knockTaken * (b.dashT > 0 ? 3 : 1); a.vy -= ny * k * b.st.knock * a.st.knockTaken * (b.dashT > 0 ? 3 : 1);
+        b.vx += nx * k * a.st.gun.knock * b.st.knockTaken * (a.dashT > 0 ? 3 : 1); b.vy += ny * k * a.st.gun.knock * b.st.knockTaken * (a.dashT > 0 ? 3 : 1);
+        a.vx -= nx * k * b.st.gun.knock * a.st.knockTaken * (b.dashT > 0 ? 3 : 1); a.vy -= ny * k * b.st.gun.knock * a.st.knockTaken * (b.dashT > 0 ? 3 : 1);
       }
     }
-    // turret orbs
-    for (let i = orbs.length - 1; i >= 0; i--) {
-      const o = orbs[i];
-      o.life -= dt;
-      if (o.homing) {
-        let best = null, bd = 1e9;
-        for (const p of alive()) { const d = Math.hypot(p.x - o.x, p.y - o.y); if (d < bd) { bd = d; best = p; } }
-        if (best) {
-          const a = Math.atan2(o.vy, o.vx), want = Math.atan2(best.y - 4 - o.y, best.x - o.x);
-          const na = a + clamp(angleDiff(a, want), -1.6 * o.homing * dt, 1.6 * o.homing * dt), sp = Math.hypot(o.vx, o.vy);
-          o.vx = Math.cos(na) * sp; o.vy = Math.sin(na) * sp;
-        }
-      }
-      o.x += o.vx * dt; o.y += o.vy * dt;
-      let dead = o.life <= 0;
-      const hitX = o.x < 0 || o.x > 320, hitY = o.y < TOP || o.y > BOT;
-      if ((hitX || hitY) && o.life < 5.7) {
-        if (o.bounces > 0) {
-          if (hitX) o.vx = -o.vx; if (hitY) o.vy = -o.vy;
-          o.x = clamp(o.x, 0, 320); o.y = clamp(o.y, TOP, BOT); o.bounces -= 1;
-          if (o.split > 0) { o.split -= 1; orbs.push({ ...o, vx: o.vx * 0.9 - o.vy * 0.4, vy: o.vy * 0.9 + o.vx * 0.4 }); }
-        } else dead = true;
-      }
-      for (const p of alive()) if (!dead && Math.hypot(p.x - o.x, p.y - 4 - o.y) < p.r + o.r) { hurt(p, o.x, o.y); dead = true; }
-      if (dead) { fx.burst(o.x, o.y, 4, SEAT_COLORS[o.owner.idx], { speed: 40, life: 0.2 }); orbs.splice(i, 1); }
-    }
+    guns.update(dt);
+    pickups.update(dt, players.filter((p) => !p.out).map((p) => ({ p, x: p.x, y: p.y - 4, r: p.r + 2, mult: p.mult })));
 
     const started = players.filter((p) => p.outT !== -1).length;
     if (endT === null && ((started > 1 && alive().length <= 1) || started > 0 && alive().length === 0 || t >= TIME)) endT = 1.1;
@@ -288,8 +279,8 @@ export function create(ctx) {
         else { g.rect(c * TW, TY0 + r * TW, TW - 1, TW - 1, '#ff6a6a'); g.rect(c * TW + 3, TY0 + r * TW + 3, TW - 7, TW - 7, '#fff'); }
       }
     }
-    // orbs
-    for (const o of orbs) { g.circle(o.x, o.y, o.r, SEAT_COLORS[o.owner.idx]); g.circle(o.x, o.y, o.r * 0.4, '#fff'); }
+    pickups.draw(g);
+    guns.draw(g);
     // players
     for (const p of players) {
       if (p.out) continue;
@@ -299,6 +290,7 @@ export function create(ctx) {
       if (p.shields) g.ring(p.x, p.y - 5, 8 * p.st.size, '#9fd3ff88');
       if (p.dashCd <= 0) g.rect(p.x - 1, p.y + 2, 2, 1, '#fff');
       drawTag(g, p.idx, p.x, p.y - 11 * p.st.size);
+      drawBuffs(g, p, p.x, p.y + 4);
       for (let k = 0; k < p.hearts; k++) g.rect(p.x - p.hearts * 1.5 + k * 3, p.y - 11 * p.st.size - 9, 2, 2, '#ff5a5a');
     }
     // lasers & balls on top
@@ -334,7 +326,8 @@ export function create(ctx) {
       if (!p.out || game.finished) continue;
       const q = perimeterPos(p.tur.s);
       g.circle(q.x, q.y, 5, SEAT_COLORS[p.idx]); g.circle(q.x, q.y, 2.5, '#0b0a12');
-      g.rect(q.x + q.nx * 5 - 1, q.y + q.ny * 5 - 1, 3, 3, '#fff');
+      const ta = p.tur.a ?? Math.atan2(q.ny, q.nx);
+      g.rect(q.x + Math.cos(ta) * 6 - 1, q.y + Math.sin(ta) * 6 - 1, 3, 3, '#fff');
       g.text(`P${p.idx + 1}`, q.x + q.nx * 14, q.y + q.ny * 14 - 3, { scale: 1, col: p.tur.cd <= 0 ? SEAT_COLORS[p.idx] : '#777', align: 'center', ui: false });
     }
   };
