@@ -3,21 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Last Call Arcade · Controller Test</title>
-<link rel="stylesheet" href="src/controller-test/style.css">
+<title>Last Call Arcade</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #07060c; overflow: hidden; cursor: none; }
+  body { display: grid; place-items: center; }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+</style>
 </head>
 <body>
-<main id="app">
-  <header class="top">
-    <h1>LAST CALL ARCADE <span>controller test</span></h1>
-    <div id="status" class="status"></div>
-  </header>
-  <section id="banner" class="banner"></section>
-  <section id="seats" class="seats"></section>
-  <section id="footer" class="footer"></section>
-  <section id="overlay" class="overlay hidden"></section>
-</main>
-<noscript>This test needs JavaScript.</noscript>
-<script type="module" src="src/controller-test/app.js"></script>
+<canvas id="game" width="640" height="360"></canvas>
+<noscript>Last Call Arcade needs JavaScript.</noscript>
+<script type="module" src="src/game/main.js"></script>
 </body>
 </html>

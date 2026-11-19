@@ -1,6 +1,7 @@
 // Unit tests for the input adapter and the Milestone 0 pass criteria.
 // Run: serve the project folder, open /tests/ in a browser. No install needed.
 import { InputAdapter, BTN } from '../src/input/gamepad-adapter.js';
+import { results as gameResults } from './game-tests.js';
 import { TestRun, ReconnectCheck, verdict, TEST_MS } from '../src/controller-test/test-run.js';
 
 const results = [];
@@ -246,6 +247,7 @@ test('verdict', () => {
 });
 
 // ---- report ----
+results.push(...gameResults);
 const failed = results.filter((r) => !r.ok);
 document.getElementById('out').innerHTML =
   `<h1>${failed.length ? 'FAILED' : 'ALL PASS'}: ${results.length - failed.length}/${results.length}</h1>` +
