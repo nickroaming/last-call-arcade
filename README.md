@@ -4,6 +4,7 @@ A couch party game for 2-3 players on one Xbox Series X (Edge browser) and one T
 Ten arcade minigames; a match plays 8 of them. Every game shares a ROUNDS-style gun: bullets drop, bounce, split, home in and explode. Losers draft trade-off cards that stack into combos. Winners get the Winner's Curse.
 
 - **Play:** https://nickroaming.github.io/last-call-arcade/
+- **Online seat test (remote player):** https://nickroaming.github.io/last-call-arcade/online-test.html · steps in [docs/ONLINE_SEAT_TEST.md](docs/ONLINE_SEAT_TEST.md)
 - **Controller test (Milestone 0):** https://nickroaming.github.io/last-call-arcade/controller-test.html
 - Design notes and research on ROUNDS and 8Bit Fiesta: [docs/DESIGN.md](docs/DESIGN.md)
 - Builds and test results: [BUILD_LOG.md](BUILD_LOG.md) · Original brief: [Claude_Game_Brief.md](Claude_Game_Brief.md)

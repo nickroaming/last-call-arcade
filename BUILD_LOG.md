@@ -5,12 +5,17 @@ Lab results (desktop browser, simulated controllers) and hardware results (real 
 ## Builds
 | Build | Date | What changed | Test link |
 | --- | --- | --- | --- |
+| online-test-1 | 2026-11-19 | Online seat test: Xbox hosts and streams a test picture over WebRTC (PeerJS public service for setup, Google STUN, no relay server), the remote player sends controller input, PASS/FAIL on both sides | https://nickroaming.github.io/last-call-arcade/online-test.html |
 | m1-2026-11-19.4 | 2026-11-19 | 3 new games: Tick Tock, Updraft, Lights Out (10 total). Office mode: CPU players (C key / RT), Enter starts, IJKL aim | https://nickroaming.github.io/last-call-arcade/ |
 | m1-2026-11-19.3 | 2026-11-19 | ROUNDS-style gun system shared by all games (bounce, split, home, retarget, sticky, explode, boomerang, wind-up, wave, poison, frost, lifesteal, phase). 33 rarity cards with +/- lines. 3 new games (Orbit Outpost, Blast Ball, Splat City). 5 Rooftop maps. Physics twists. Color drift (Subtle/Wild/Off). Winner's Curse (tipsy handicap + optional sip prompt). Arena power-ups weighted to losers. 8-event playlist from 7 games | https://nickroaming.github.io/last-call-arcade/ |
 | m1-2026-11-19.2 | 2026-11-19 | Full game: 4 hazard-heavy minigames, 13 trade-off power cards that stack (cap 2), comeback draft, 8-event match, sudden death, podium, rematch, pause, shake/sound/House Rules settings, synth music and SFX. Controller test moved to /controller-test.html | https://nickroaming.github.io/last-call-arcade/ |
 | m0-2026-11-19.1 | 2026-11-19 | First controller test: 3 seats, 30 s test, pause, reconnect, PASS/FAIL | https://nickroaming.github.io/last-call-arcade/ |
 
 ## Lab results (not real hardware)
+**online-test-1** · two tabs of the same Chromium browser on one Mac
+- Host and joiner both PASS: room opened through the PeerJS public service, direct connection made, video at 30 fps (640x360), controller input arriving at about 29/s, remote presses visible in the streamed picture.
+- The 1 ms delay is meaningless (same machine). Not covered: two different homes, Xbox Edge sending video, the PS4 browser, networks that need a relay server.
+
 **m1-2026-11-19.4** · Chromium-based browser pane on macOS, keyboard and CPU players
 - Tests: 82/82 pass, including CPU bots driving all 10 games to a finish and robot playthroughs of the new games (6 variants, every twist, 2 players, every card stacked).
 - Office mode checked with key presses only: Space joined, C added two CPUs, Enter started, Tick Tock played. Watch mode (3 CPUs) played Updraft through to results and the draft.

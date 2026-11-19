@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Last Call Arcade · Online Seat Test</title>
+<style>
+  :root { --bg: #12101c; --panel: #1f1b2e; --ink: #f4f1ff; --dim: #a59fc4; --good: #7dff8a; --bad: #ff5a5a; --warn: #ffd84a; --acc: #33d6ff; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font-family: "Segoe UI", system-ui, sans-serif; }
+  body { padding: 3vh 4vw; font-size: clamp(15px, 2.2vmin, 26px); }
+  h1 { margin: 0 0 .4em; font-size: 1.6em; }
+  h1 span { color: var(--dim); font-weight: 500; font-size: .7em; }
+  .row { display: flex; gap: 1em; flex-wrap: wrap; align-items: stretch; }
+  .panel { background: var(--panel); border-radius: .6em; padding: .8em 1em; flex: 1 1 18em; }
+  button { font: inherit; font-weight: 800; padding: .7em 1.2em; border-radius: .5em; border: .15em solid var(--acc); background: #0b0a12; color: var(--ink); cursor: pointer; }
+  button:focus { outline: .2em solid var(--warn); }
+  input { font: inherit; font-size: 1.6em; width: 6em; text-transform: uppercase; letter-spacing: .2em; padding: .2em .4em; border-radius: .3em; border: .15em solid var(--acc); background: #0b0a12; color: var(--ink); }
+  .code { font-size: 4em; font-weight: 900; letter-spacing: .25em; color: var(--warn); }
+  .checks { list-style: none; padding: 0; margin: .4em 0; }
+  .checks li { padding: .15em 0; }
+  .pass::before { content: '✔ PASS  '; color: var(--good); font-weight: 900; }
+  .fail::before { content: '✘ FAIL  '; color: var(--bad); font-weight: 900; }
+  .wait::before { content: '…  '; color: var(--dim); font-weight: 900; }
+  .small { color: var(--dim); font-size: .8em; }
+  canvas, video { width: 100%; max-width: 960px; aspect-ratio: 16/9; background: #000; border-radius: .4em; display: block; }
+  .pad { display: flex; gap: .3em; flex-wrap: wrap; margin-top: .4em; }
+  .b { min-width: 2.4em; text-align: center; padding: .15em .3em; border: .12em solid #4a4466; border-radius: .3em; font-weight: 800; color: var(--dim); }
+  .b.on { background: var(--ink); color: #000; border-color: var(--ink); }
+  .stick { width: 4em; height: 4em; border: .15em solid #4a4466; border-radius: 50%; position: relative; display: inline-block; }
+  .stick i { position: absolute; width: 1.2em; height: 1.2em; border-radius: 50%; background: var(--acc); left: 50%; top: 50%; margin: -.6em 0 0 -.6em; }
+  .big { font-size: 1.4em; font-weight: 800; }
+  .hidden { display: none !important; }
+  .verdict { font-size: 2.4em; font-weight: 900; }
+  .verdict.ok { color: var(--good); } .verdict.no { color: var(--bad); } .verdict.wait { color: var(--warn); }
+</style>
+</head>
+<body>
+<h1>LAST CALL ARCADE <span>online seat test</span></h1>
+
+<section id="choose" class="row">
+  <div class="panel">
+    <div class="big">On the Xbox (the TV everyone is watching)</div>
+    <p>Press <b>A</b> on a controller, or click:</p>
+    <button id="hostBtn">HOST A ROOM</button>
+  </div>
+  <div class="panel">
+    <div class="big">Your brother (laptop, PC, phone or PS4)</div>
+    <p>Type the 4-letter room code from the TV:</p>
+    <input id="codeIn" maxlength="4" autocomplete="off" spellcheck="false"> <button id="joinBtn">JOIN</button>
+    <p class="small">Plug in or pair the PS4 controller first, then press any button on it.</p>
+  </div>
+  <div class="panel">
+    <div class="big">This browser can…</div>
+    <ul class="checks" id="caps"></ul>
+  </div>
+</section>
+
+<section id="host" class="hidden">
+  <div class="row">
+    <div class="panel"><div class="small">ROOM CODE</div><div class="code" id="codeOut">····</div><div id="hostStatus" class="small">Starting…</div></div>
+    <div class="panel"><div class="small">RESULT</div><div class="verdict wait" id="hostVerdict">WAITING</div><ul class="checks" id="hostChecks"></ul></div>
+  </div>
+  <div class="row" style="margin-top:1em">
+    <div class="panel" style="flex: 2 1 30em"><div class="small">THIS PICTURE IS STREAMED TO THE REMOTE PLAYER</div><canvas id="stage" width="640" height="360"></canvas></div>
+    <div class="panel"><div class="small">REMOTE PLAYER'S CONTROLLER (LIVE)</div><div id="remotePad"><div class="small">Nobody connected yet</div></div><div id="hostStats" class="small"></div></div>
+  </div>
+</section>
+
+<section id="join" class="hidden">
+  <div class="row">
+    <div class="panel" style="flex: 2 1 30em"><div class="small">LIVE FROM THE XBOX</div><video id="remoteVideo" autoplay playsinline muted></video><button id="unmute" class="hidden" style="margin-top:.5em">TAP TO START VIDEO</button></div>
+    <div class="panel"><div class="small">RESULT</div><div class="verdict wait" id="joinVerdict">CONNECTING</div><ul class="checks" id="joinChecks"></ul><div id="joinStats" class="small"></div><div class="small" style="margin-top:.6em">YOUR CONTROLLER</div><div id="localPad"></div></div>
+  </div>
+</section>
+
+<p class="small" id="foot"></p>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+// Old-style script on purpose: it must run even on old browsers (like the PS4's).
+(function () {
+  var caps = document.getElementById('caps');
+  function row(ok, text) { var li = document.createElement('li'); li.className = ok ? 'pass' : 'fail'; li.appendChild(document.createTextNode(text)); caps.appendChild(li); }
+  row(!!navigator.getGamepads, 'Read a game controller (Gamepad API)');
+  row(typeof RTCPeerConnection !== 'undefined', 'Make a direct connection (WebRTC)');
+  var cv = document.createElement('canvas');
+  row(typeof cv.captureStream === 'function', 'Send video (needed only on the Xbox / host)');
+  row(typeof Promise !== 'undefined' && typeof fetch !== 'undefined', 'Run the online test (modern JavaScript)');
+  document.getElementById('foot').appendChild(document.createTextNode('Browser: ' + navigator.userAgent));
+  window.__capsDone = true;
+})();
+</script>
+<script src="src/online/online-test.js"></script>
+</body>
+</html>
