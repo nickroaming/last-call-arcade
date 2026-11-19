@@ -54,11 +54,17 @@
     <div class="big">This browser can…</div>
     <ul class="checks" id="caps"></ul>
   </div>
+  <div class="panel">
+    <div class="big">Network check</div>
+    <p class="small">Tests the connection service, a full connection on this device, and whether your internet allows direct connections.</p>
+    <button id="checkBtn">RUN NETWORK CHECK</button>
+    <ul class="checks" id="netChecks"></ul>
+  </div>
 </section>
 
 <section id="host" class="hidden">
   <div class="row">
-    <div class="panel"><div class="small">ROOM CODE</div><div class="code" id="codeOut">····</div><div id="hostStatus" class="small">Starting…</div></div>
+    <div class="panel"><div class="small">ROOM CODE</div><div class="code" id="codeOut">····</div><div id="hostStatus" class="small">Starting…</div><div class="small" style="margin-top:.5em;color:var(--warn)">Keep this page open with the screen on.</div></div>
     <div class="panel"><div class="small">RESULT</div><div class="verdict wait" id="hostVerdict">WAITING</div><ul class="checks" id="hostChecks"></ul></div>
   </div>
   <div class="row" style="margin-top:1em">
@@ -74,6 +80,7 @@
   </div>
 </section>
 
+<div class="panel" id="logBox" style="margin-top:1em"><div class="small">WHAT HAPPENED (screenshot this if it fails)</div><pre id="log" class="small" style="white-space:pre-wrap;margin:.3em 0 0">Nothing yet.</pre></div>
 <p class="small" id="foot"></p>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>

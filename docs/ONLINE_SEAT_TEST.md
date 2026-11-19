@@ -5,6 +5,18 @@ It takes about 10 minutes. You both need to be available at the same time (a pho
 
 **Test page:** https://nickroaming.github.io/last-call-arcade/online-test.html
 
+## First try (19 Nov): failed with "Error: network"
+The phone that hosted lost its link to the free connection service (most likely the phone locked or the app was switched while sending the code). The old test page never reconnected, so the room vanished and the laptop could not find it.
+
+**Fixed in the new version:**
+- The room reconnects to the service on its own (tested: back in about 1.5 s after a forced drop). A drop never cuts off a player who is already connected.
+- The page asks to keep the screen on.
+- Joining keeps looking for the room for about 30 s instead of failing on the first miss.
+- A **RUN NETWORK CHECK** button (or add `?check` to the link) tests the service, a full connection on the device, and whether the router allows direct links between homes.
+- A **WHAT HAPPENED** log at the bottom. Screenshot it if anything fails.
+
+**Before the next try:** on each device, run the network check first and screenshot it. Keep the host screen on and in front while your brother joins (send him the code from a different device, or read it out on a call).
+
 ## Part 1: your brother checks his PS4 (2 minutes, any time)
 1. On the PS4, open the **Internet Browser** and go to the test page above.
 2. Look at the box **"This browser can…"** and send a photo of it.
@@ -41,6 +53,7 @@ It takes about 10 minutes. You both need to be available at the same time (a pho
 | TV: ✘ "This browser can send video" | The Xbox can't stream. Fallback: host from a laptop plugged into the TV. |
 | TV or his side: ✘ "Could not reach the connection service" | The free connection service is down or blocked. Try again later or on another network. |
 | His side: ✘ "No room called …" | Wrong code, or the TV page was closed. Re-check the code. |
+| "Strict router (symmetric NAT)" in the network check | Direct links between homes will likely fail. We'll add a relay server (needs a free account). |
 | Connected but video never plays | Your home networks block direct connections. We'll add a relay server (needs a free account). |
 | Delay over 250 ms | Playable for slower games, rough for Ricochet Rooftop. We'll lower the video quality. |
 
