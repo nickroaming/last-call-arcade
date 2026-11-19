@@ -5,7 +5,7 @@ Lab results (desktop browser, simulated controllers) and hardware results (real 
 ## Builds
 | Build | Date | What changed | Test link |
 | --- | --- | --- | --- |
-| m0-2026-11-19.1 | 2026-11-19 | First controller test: 3 seats, 30 s test, pause, reconnect, PASS/FAIL | not published yet |
+| m0-2026-11-19.1 | 2026-11-19 | First controller test: 3 seats, 30 s test, pause, reconnect, PASS/FAIL | https://nickroaming.github.io/last-call-arcade/ |
 
 ## Lab results (not real hardware)
 **m0-2026-11-19.1** · Chromium-based browser pane on macOS, gamepads simulated in JavaScript
