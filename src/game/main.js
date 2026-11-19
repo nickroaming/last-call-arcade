@@ -17,9 +17,13 @@ import * as coins from '../games/coins.js';
 import * as orbit from '../games/orbit.js';
 import * as blastball from '../games/blastball.js';
 import * as splat from '../games/splat.js';
+import * as tick from '../games/tick.js';
+import * as updraft from '../games/updraft.js';
+import * as lightsout from '../games/lightsout.js';
+import { Bot } from './bots.js';
 
-export const BUILD = 'm1-2026-11-19.3';
-export const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat };
+export const BUILD = 'm1-2026-11-19.4';
+export const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout };
 const GAME_IDS = Object.keys(GAMES);
 const params = new URLSearchParams(location.search);
 const MIN_PLAYERS = params.has('solo') ? 1 : 2;
@@ -34,9 +38,13 @@ const DEFAULT_PROMPTS = ['Toast the winner!', 'Snack break - grab something', 'L
 // ---------- setup ----------
 try { if ('gamepadInputEmulation' in navigator) navigator.gamepadInputEmulation = 'gamepad'; } catch (e) { /* ignore */ }
 installKeyboard();
+const bots = [];
+let wantBot = 0;
+let kbStart = false;
+addEventListener('keydown', (e) => { if (e.code === 'KeyC' && !e.repeat) wantBot += 1; if (e.code === 'Enter' && !e.repeat) kbStart = true; });
 const input = new InputAdapter({
   seatCount: 3,
-  getGamepads: () => [...(navigator.getGamepads ? Array.from(navigator.getGamepads()) : []), ...keyboardPads()],
+  getGamepads: () => [...(navigator.getGamepads ? Array.from(navigator.getGamepads()) : []), ...keyboardPads(), ...bots.map((b) => b.pad())],
 });
 const canvas = document.getElementById('game');
 const g = new Gfx(canvas);
@@ -163,7 +171,7 @@ function toFinal() {
   sound.sfx('win');
 }
 function toTitle(resetSeats) {
-  if (resetSeats) input.resetAll();
+  if (resetSeats) { input.resetAll(); bots.length = 0; }
   input.joinOpen = true;
   st.match = null; st.game = null; st.paused = false;
   go('title');
@@ -181,7 +189,25 @@ function maybePrompt() {
 }
 
 // ---------- update ----------
+const isBotSeat = (s) => s && s.padId === 'CPU player';
+function addBot() {
+  if (!input.joinOpen) return;
+  if (input.seats.every((s) => s.state !== 'empty')) {
+    const b = bots.pop();
+    if (b) { const seat = input.seats.find((s) => s.padIndex === b.index); if (seat) input.leave(seat); sound.sfx('lose'); }
+    return;
+  }
+  const b = new Bot(); b.tap(BTN.A); bots.push(b); sound.sfx('move');
+}
+function runBots(dt) {
+  while (wantBot > 0) { wantBot -= 1; addBot(); }
+  for (const b of bots) {
+    const seat = input.seats.find((s) => s.padIndex === b.index && s.state !== 'empty');
+    b.think({ screen: st.paused ? 'paused' : st.screen, dt, game: st.game, seatN: seat ? seat.n : null });
+  }
+}
 function update(dt) {
+  runBots(dt);
   const events = input.update(performance.now());
   if (events.some((e) => e.type === 'press' || e.type === 'join')) sound.ensure();
   for (const e of events) {
@@ -286,7 +312,9 @@ function updateTitle(dt) {
   if (anyPressed(BTN.LB)) toggleMute();
   if (anyPressed(BTN.RB)) { settings.house = !settings.house; save('house', settings.house); sound.sfx('move'); }
   if (anyPressed(BTN.LT)) cycleTrip();
-  if (input.activeCount >= MIN_PLAYERS && (anyPressed(BTN.X) || anyPressed(BTN.MENU))) { sound.sfx('go'); startMatch(); }
+  if (anyPressed(BTN.RT)) wantBot += 1;
+  const go2 = kbStart; kbStart = false;
+  if (input.activeCount >= MIN_PLAYERS && (anyPressed(BTN.X) || anyPressed(BTN.MENU) || go2)) { sound.sfx('go'); startMatch(); }
 }
 
 function updateDraft(controls) {
@@ -364,16 +392,16 @@ function drawTitle() {
     } else {
       const hop = s.state === 'active' ? Math.abs(Math.sin(t * 5 + i)) * 6 : 0;
       drawPlayer(g, i, x, y - hop, { size: 2, squash: hop < 1 ? 0.5 : 0, alpha: s.state === 'active' ? 1 : 0.4 });
-      g.text(seatLabel(i + 1), x, y + 9, { scale: 2, col: SEAT_COLORS[i], align: 'center' });
+      g.text(seatLabel(i + 1) + (isBotSeat(s) ? ' CPU' : ''), x, y + 9, { scale: 2, col: SEAT_COLORS[i], align: 'center' });
       if (s.state === 'disconnected') g.text('CONTROLLER OFF', x, y + 18, { scale: 1, col: '#ff5a5a', align: 'center' });
     }
   });
   const n = input.activeCount;
   if (n >= MIN_PLAYERS) {
-    if (Math.floor(t * 3) % 2) g.text('PRESS X OR MENU TO START', 160, 59, { scale: 2, col: '#7dff8a', align: 'center' });
+    if (Math.floor(t * 3) % 2) g.text('PRESS X, MENU OR ENTER TO START', 160, 59, { scale: 2, col: '#7dff8a', align: 'center' });
   } else g.text(MIN_PLAYERS > 1 ? 'NEED 2 OR 3 PLAYERS' : 'PRESS A TO JOIN', 160, 59, { scale: 2, col: '#ffffffaa', align: 'center' });
   g.text(`Y SHAKE: ${SHAKE_LEVELS[settings.shake].name}  LB SOUND: ${settings.muted ? 'OFF' : 'ON'}  RB HOUSE RULES: ${settings.house ? 'ON' : 'OFF'}  LT COLOR: ${TRIP_LEVELS[settings.trip].name}`, 160, 165, { scale: 1, col: '#c8c0ff', align: 'center' });
-  g.text('HOLD VIEW TO LEAVE A SEAT   KEYBOARD: WASD SPACE F G / ARROWS / . ,', 160, 172, { scale: 1, col: '#7a70a0', align: 'center' });
+  g.text('KEYS: WASD MOVE  SPACE=A  F=SHOOT  G=BLOCK  IJKL=AIM  ENTER=START  C=ADD CPU', 160, 172, { scale: 1, col: '#9a90c0', align: 'center' });
   g.text(BUILD, 318, 2, { scale: 1, col: '#5a5080', align: 'right' });
   if (sound.blocked && !settings.muted) g.text('SOUND STARTS AFTER YOUR FIRST BUTTON PRESS', 160, 96, { scale: 1, col: '#ffd84a', align: 'center' });
   fx.draw(g);

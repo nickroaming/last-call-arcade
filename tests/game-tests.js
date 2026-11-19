@@ -14,21 +14,25 @@ import * as coins from '../src/games/coins.js';
 import * as orbit from '../src/games/orbit.js';
 import * as blastball from '../src/games/blastball.js';
 import * as splat from '../src/games/splat.js';
+import * as tick from '../src/games/tick.js';
+import * as updraft from '../src/games/updraft.js';
+import * as lightsout from '../src/games/lightsout.js';
+import { Bot } from '../src/game/bots.js';
 
-const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat };
+const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout };
 export const results = [];
 function test(name, fn) { try { fn(); results.push({ name, ok: true }); } catch (e) { results.push({ name, ok: false, err: e.message + (e.stack ? ' @ ' + e.stack.split('\n')[1] : '') }); } }
 function eq(a, b, msg = '') { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg} expected ${JSON.stringify(b)} got ${JSON.stringify(a)}`); }
 function ok(v, msg = 'expected true') { if (!v) throw new Error(msg); }
 
 // ---- match ----
-test('playlist: 8 events from 7 games, all games, max 2 each, no back-to-back', () => {
-  const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+test('playlist: 8 events from 10 games, no repeats needed, no back-to-back', () => {
+  const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
   for (let k = 0; k < 300; k++) {
     const p = makePlaylist(ids, 2, Math.random, 8);
     eq(p.length, 8);
     ok(p.every((g, i) => i === 0 || g !== p[i - 1]), p.join());
-    ids.forEach((g) => ok(p.includes(g), 'missing ' + g));
+    eq(new Set(p).size, 8, 'all different');
     ids.forEach((g) => ok(p.filter((x) => x === g).length <= 2));
   }
 });
@@ -254,6 +258,25 @@ test('rumble sudden death: ghosts start out and rank last', () => {
   const { game } = playthrough('rumble', { ghosts: [3] });
   ok(game.finished);
   eq(game.ranking[2], 3);
+});
+test('CPU bots drive every game to a finish', () => {
+  for (const id of Object.keys(GAMES)) {
+    const fx = new Fx();
+    const game = GAMES[id].create({ fx, sound: NO_SOUND, variant: 1, players: [1, 2, 3].map((s) => ({ seat: s, idx: s - 1, stats: statsFor({}), pickupMult: 1 })) });
+    const bots = [1, 2, 3].map(() => new Bot());
+    let n = 0;
+    while (!game.finished && n < 60 * 80) {
+      const m = new Map();
+      bots.forEach((b, k) => {
+        b.think({ screen: 'play', dt: 1 / 60, game, seatN: k + 1 });
+        const pd = b.pad();
+        const btn = (i) => pd.buttons[i].pressed;
+        m.set(k + 1, { ...NO_CONTROLS, mx: pd.axes[0], my: pd.axes[1], ax: pd.axes[2], ay: pd.axes[3], aim: Math.hypot(pd.axes[2], pd.axes[3]) > 0.35, jump: btn(0), jumpP: btn(0), fire: btn(2), fireP: btn(2), block: btn(5), blockP: btn(5) });
+      });
+      fx.update(1 / 60); game.update(1 / 60, m); n++;
+    }
+    ok(game.finished, id + ' did not finish with bots');
+  }
 });
 test('draw functions run without errors', () => {
   const g = new Gfx(document.createElement('canvas'));

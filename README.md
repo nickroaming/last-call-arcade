@@ -1,7 +1,7 @@
 # Last Call Arcade
 
 A couch party game for 2-3 players on one Xbox Series X (Edge browser) and one TV.
-Seven arcade minigames rotate through an 8-event match. Every game shares a ROUNDS-style gun: bullets drop, bounce, split, home in and explode. Losers draft trade-off cards that stack into combos. Winners get the Winner's Curse.
+Ten arcade minigames; a match plays 8 of them. Every game shares a ROUNDS-style gun: bullets drop, bounce, split, home in and explode. Losers draft trade-off cards that stack into combos. Winners get the Winner's Curse.
 
 - **Play:** https://nickroaming.github.io/last-call-arcade/
 - **Controller test (Milestone 0):** https://nickroaming.github.io/last-call-arcade/controller-test.html
@@ -26,8 +26,21 @@ Seven arcade minigames rotate through an 8-event match. Every game shares a ROUN
 | Orbit Outpost | run around the planet | jump | shoot (bullets orbit) | block |
 | Blast Ball | stick | dash into the ball | shoot the ball | block |
 | Splat City | stick (your feet paint) | dash | paint gun | block |
+| Tick Tock | stick | dash | holding the bomb: throw it; otherwise shoot to shove | block (tags bounce off) |
+| Updraft | stick | jump, double jump | shoot (knock rivals off ledges) | block |
+| Lights Out | stick (flashlight follows) | dash | shoot (shots light the room) | block |
 
 Handy link options: `?events=4` for a short match, `?only=orbit` to practise one game, `?twist=moon` to force a twist, `?solo` to start with one player, `?rules=Toast the winner|Snack break` for your own House Rules prompts.
+
+## Playing without a controller (office mode)
+Open the link in any desktop browser (Chrome, Edge or Safari):
+1. Press **Space** to join as P1 on the keyboard.
+2. Press **C** once or twice to add CPU players (on a controller, **RT** does the same). Press C again when all seats are full to remove the last CPU.
+3. Press **Enter** to start.
+
+Keys: **WASD** move · **Space** = A (jump/dash/ready) · **F** = X (shoot) · **G** = RB (block) · **IJKL** aim · **R** = Y · **E** = LB · **Enter** = Menu/pause.
+A second person can use the arrows with **/** (A), **.** (X), **,** (RB) and **Backspace** (Menu).
+With only CPUs seated, Enter still starts the match, so you can watch them play for balance checks.
 
 ## Run it on a Mac (no install needed)
 ```bash

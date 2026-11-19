@@ -90,3 +90,13 @@ Five arenas: Neon Roofs, Water Tower, Billboard, Crane Yard and Staircase.
 
 ## Match length
 7 games. A match plays 8 events: every game once plus one repeat, shuffled with no back-to-back repeats.
+
+---
+
+# Build 4: three more minigames and office mode
+
+8. **Tick Tock** (top-down). Hot potato with a live bomb you can throw. A thrown bomb sticks to whoever it hits. Blocking bounces tags and throws away. A loose bomb that nobody touches rolls toward the nearest player. If it blows while loose, whoever touched it last is out. The fuse ticks faster as it burns, and the numbers only show for the last 3 seconds. Conveyor belts, ice and pillars move the bomb around. Players without the bomb shoot to shove the holder, or the loose bomb, toward someone else. Blown-up players become ghosts with a gust that shoves people and the bomb.
+9. **Updraft** (vertical climb). The screen climbs and a laser floor follows. Ledges come in normal, moving, crumbling and spring types. Falling icicles have warnings, and side gusts push you. Shoot rivals off their ledges. The sky changes color as you climb. Zapped players become storm clouds that drop icicles.
+10. **Lights Out** (top-down, in the dark). You see only what flashlights, bullets, glinting gems and lightning reveal. A guard robot patrols with a red searchlight, and getting spotted costs half your gems. A second guard arrives at 18 s, and a big gem spawns somewhere every 9 s.
+
+**Office mode.** CPU players are fake gamepads that think every frame, so they join, play, pick cards and ready up through the same input path as a real controller. Every game has a `botTarget(seat)` hint (the bomb, the next gate, the ball, a gem, a ledge), and the CPU fights the nearest rival when there's no hint. Keyboard player 1 can aim with IJKL.

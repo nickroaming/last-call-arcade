@@ -44,17 +44,17 @@ export function readControls(seat) {
 
 // ---------- keyboard controllers (for testing on a computer) ----------
 const KB_MAPS = [
-  { name: 'Keyboard 1 (WASD)', up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD',
+  { name: 'Keyboard 1 (WASD)', up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', aim: ['KeyI', 'KeyK', 'KeyJ', 'KeyL'],
     [BTN.A]: 'Space', [BTN.X]: 'KeyF', [BTN.RB]: 'KeyG', [BTN.Y]: 'KeyR', [BTN.LB]: 'KeyE', [BTN.MENU]: 'Enter', [BTN.VIEW]: 'Tab' },
   { name: 'Keyboard 2 (arrows)', up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight',
-    [BTN.A]: 'Slash', [BTN.X]: 'Period', [BTN.RB]: 'Comma', [BTN.Y]: 'Quote', [BTN.LB]: 'KeyL', [BTN.MENU]: 'Backspace', [BTN.VIEW]: 'Backslash' },
+    [BTN.A]: 'Slash', [BTN.X]: 'Period', [BTN.RB]: 'Comma', [BTN.Y]: 'Quote', [BTN.LB]: 'Semicolon', [BTN.MENU]: 'Backspace', [BTN.VIEW]: 'Backslash' },
 ];
 const down = new Set();
 const used = [false, false];
 export function installKeyboard() {
   addEventListener('keydown', (e) => {
     down.add(e.code);
-    KB_MAPS.forEach((m, i) => { if (Object.values(m).includes(e.code)) used[i] = true; });
+    KB_MAPS.forEach((m, i) => { if (Object.values(m).flat().includes(e.code)) used[i] = true; });
   }, { capture: true });
   addEventListener('keyup', (e) => down.delete(e.code), { capture: true });
   addEventListener('blur', () => down.clear());
@@ -69,7 +69,9 @@ export function keyboardPads() {
     });
     const ax = (down.has(m.right) ? 1 : 0) - (down.has(m.left) ? 1 : 0);
     const ay = (down.has(m.down) ? 1 : 0) - (down.has(m.up) ? 1 : 0);
-    pads.push({ index: 40 + i, id: m.name, connected: true, mapping: 'standard', timestamp: 0, buttons, axes: [ax, ay, 0, 0] });
+    let rx = 0, ry = 0;
+    if (m.aim) { ry = (down.has(m.aim[1]) ? 1 : 0) - (down.has(m.aim[0]) ? 1 : 0); rx = (down.has(m.aim[3]) ? 1 : 0) - (down.has(m.aim[2]) ? 1 : 0); }
+    pads.push({ index: 40 + i, id: m.name, connected: true, mapping: 'standard', timestamp: 0, buttons, axes: [ax, ay, rx, ry] });
   });
   return pads;
 }
