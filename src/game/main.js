@@ -10,27 +10,15 @@ import { readControls, installKeyboard, keyboardPads, NO_CONTROLS } from './cont
 import { Match } from './match.js';
 import { POWER_BY_ID, RARITY, cardWhere, cardLines, TIPSY_NAMES, TIPSY_LINES, pickupMult } from './powers.js';
 import { TWISTS } from './twists.js';
-import * as rumble from '../games/rumble.js';
-import * as dustlap from '../games/dustlap.js';
-import * as lounge from '../games/lounge.js';
-import * as coins from '../games/coins.js';
-import * as orbit from '../games/orbit.js';
-import * as blastball from '../games/blastball.js';
-import * as splat from '../games/splat.js';
-import * as tick from '../games/tick.js';
-import * as updraft from '../games/updraft.js';
-import * as lightsout from '../games/lightsout.js';
-import * as mobius from '../games/mobius.js';
-import * as echo from '../games/echo.js';
-import * as mirror from '../games/mirror.js';
-import * as wormhole from '../games/wormhole.js';
-import * as rules from '../games/rules.js';
-import * as still from '../games/still.js';
+import { GAMES } from './registry.js';
 import { Bot } from './bots.js';
 import { Drift, P, glyph, prompt } from '../engine/style.js';
 
-export const BUILD = 'm1-2026-11-20.8-polish';
-export const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout, mobius, echo, mirror, wormhole, rules, still };
+export const BUILD = 'm1-2026-11-20.9-core';
+export { GAMES };
+// The core set: the events that pass the quality bar (docs/PLAYTEST.md, tests/measure.html).
+// Three per act, so every night builds from grounded to mind-bending. ALL EVENTS adds the rest.
+export const CORE = ['rumble', 'coins', 'tick', 'orbit', 'lightsout', 'mirror', 'mobius', 'wormhole', 'rules'];
 const GAME_IDS = Object.keys(GAMES);
 const params = new URLSearchParams(location.search);
 const MIN_PLAYERS = params.has('solo') ? 1 : 2;
@@ -71,8 +59,11 @@ const sound = new Sound();
 
 function load(key, def) { try { const v = localStorage.getItem('lca.' + key); return v === null ? def : JSON.parse(v); } catch (e) { return def; } }
 function save(key, v) { try { localStorage.setItem('lca.' + key, JSON.stringify(v)); } catch (e) { /* ignore */ } }
+const FIT_LEVELS = [{ name: '100%', k: 1 }, { name: '95%', k: 0.95 }, { name: '90%', k: 0.9 }];
+const MUSIC_LEVELS = [{ name: '100%', v: 1 }, { name: '50%', v: 0.5 }, { name: 'OFF', v: 0 }];
 const settings = {
   shake: load('shake', 0), muted: load('muted', false), house: load('house', false), trip: load('look', 0), calm: load('calm', false),
+  set: load('set', 'core'), large: load('large', false), fit: load('fit', 0), music: load('music', 0),
   prompts: params.get('rules') ? params.get('rules').split('|').map((s) => s.trim()).filter(Boolean).slice(0, 12) : DEFAULT_PROMPTS,
 };
 sound.setMuted(settings.muted);
@@ -81,6 +72,11 @@ function applyLook() {
   drift.setMode(settings.calm ? 'off' : TRIP_LEVELS[settings.trip].drift);
   fx.calm = settings.calm;
   fx.shakeK = settings.calm ? 0 : SHAKE_LEVELS[settings.shake].k;
+  g.large = fx.large = !!settings.large;
+  if (!MUSIC_LEVELS[settings.music]) settings.music = 0;
+  sound.setMusicVol(MUSIC_LEVELS[settings.music].v);
+  if (!FIT_LEVELS[settings.fit]) settings.fit = 0;
+  fit();
 }
 applyLook();
 
@@ -94,19 +90,25 @@ addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
 addEventListener('beforeunload', (e) => { if (st.match && st.screen !== 'title') { e.preventDefault(); e.returnValue = ''; } });
 
 function fit() {
-  const k = Math.min(innerWidth / 640, innerHeight / 360);
+  // SCREEN FIT shrinks the picture for TVs that crop the edges (overscan)
+  const k = Math.min(innerWidth / 640, innerHeight / 360) * (FIT_LEVELS[settings.fit] || FIT_LEVELS[0]).k;
   const kk = k >= 1 ? Math.floor(k * 2) / 2 : k; // prefer clean scales
   canvas.style.width = `${640 * kk}px`;
   canvas.style.height = `${360 * kk}px`;
 }
-addEventListener('resize', fit); fit();
+addEventListener('resize', fit);
 
 // ---------- state ----------
 const st = {
   screen: 'title', t: 0, match: null, game: null, gameId: null, variants: {}, ready: new Set(),
-  draft: null, awards: null, prompt: null, paused: false, sdWinner: null, finalOrder: null, viewHold: {}, events: [],
+  draft: null, awards: null, prompt: null, paused: false, sdWinner: null, finalOrder: null, viewHold: {}, events: [], opts: null, wipe: 0,
 };
-function go(screen) { st.screen = screen; st.t = 0; }
+const WIPE = 0.42;
+function go(screen) {
+  // a short shutter between screens; in-play changes (countdown → play → finish) don't wipe
+  if (!['play', 'finish'].includes(screen) && screen !== st.screen) st.wipe = WIPE;
+  st.screen = screen; st.t = 0;
+}
 const seatsInMatch = () => (st.match ? st.match.players.map((p) => p.seat) : []);
 const seatObj = (n) => input.seats[n - 1];
 const anyPressed = (b, seats = null) => input.seats.some((s) => (!seats || seats.includes(s.n)) && s.pressed(b));
@@ -114,7 +116,8 @@ const anyPressed = (b, seats = null) => input.seats.some((s) => (!seats || seats
 function startMatch() {
   const seats = input.seats.filter((s) => s.active).map((s) => s.n);
   input.joinOpen = false;
-  st.match = new Match(seats, ONLY && GAMES[ONLY] ? [ONLY] : GAME_IDS, { perGame: ONLY ? 4 : 2, total: ONLY ? 4 : EVENTS, tierOf: ONLY ? null : (id) => GAMES[id].meta.tier || 1 });
+  const list = ONLY && GAMES[ONLY] ? [ONLY] : settings.set === 'all' ? GAME_IDS : CORE;
+  st.match = new Match(seats, list, { perGame: ONLY ? 4 : 2, total: ONLY ? 4 : EVENTS, tierOf: ONLY ? null : (id) => GAMES[id].meta.tier || 1 });
   st.variants = {}; st.sdWinner = null;
   toIntro();
 }
@@ -233,6 +236,7 @@ function runBots(dt) {
 }
 function update(dt) {
   drift.update(dt);
+  st.wipe = Math.max(0, st.wipe - dt);
   runBots(dt);
   const events = input.update(performance.now());
   if (events.some((e) => e.type === 'press' || e.type === 'join')) sound.ensure();
@@ -244,6 +248,7 @@ function update(dt) {
   const inMatch = seatsInMatch();
   const missing = inMatch.filter((n) => !seatObj(n).active);
 
+  if (st.opts) { fx.update(dt); return updateOptions(dt); }
   if (st.screen === 'title') return updateTitle(dt);
 
   // pause (Menu) and controller drop
@@ -255,9 +260,7 @@ function update(dt) {
     if (missing.length) return;
     if (anyPressed(BTN.A, inMatch)) { st.paused = false; sound.sfx('beep'); }
     else if (anyPressed(BTN.Y, inMatch)) toTitle(false);
-    else if (anyPressed(BTN.X, inMatch)) cycleShake();
-    else if (anyPressed(BTN.LB, inMatch)) toggleMute();
-    else if (anyPressed(BTN.RB, inMatch)) cycleTrip();
+    else if (anyPressed(BTN.X, inMatch)) openOptions('pause');
     else if (anyPressed(BTN.B, inMatch)) toggleCalm();
     return;
   }
@@ -308,6 +311,9 @@ function update(dt) {
     }
     default: break;
   }
+  // the music leans in for the last seconds and at match point
+  const g2 = st.game;
+  sound.intensity = st.screen === 'play' && g2 && !g2.finished && (g2.timeLeft < 10 || (g2.matchPoint && g2.matchPoint())) ? 1 : 0;
 }
 
 function tipsyControls(controls, dt) {
@@ -322,10 +328,7 @@ function tipsyControls(controls, dt) {
     controls.set(p.seat, out);
   }
 }
-function cycleTrip() { settings.trip = (settings.trip + 1) % TRIP_LEVELS.length; save('look', settings.trip); applyLook(); fx.hueKick = TRIP_LEVELS[settings.trip].kick; sound.sfx('move'); }
 function toggleCalm() { settings.calm = !settings.calm; save('calm', settings.calm); applyLook(); sound.sfx('move'); }
-function cycleShake() { settings.shake = (settings.shake + 1) % SHAKE_LEVELS.length; save('shake', settings.shake); applyLook(); fx.shake(0.5); sound.sfx('move'); }
-function toggleMute() { settings.muted = !settings.muted; sound.setMuted(settings.muted); save('muted', settings.muted); sound.sfx('move'); }
 
 function updateTitle(dt) {
   fx.update(dt);
@@ -336,14 +339,73 @@ function updateTitle(dt) {
       if (st.viewHold[s.n] > 1.5) { input.leave(s); delete st.viewHold[s.n]; sound.sfx('lose'); }
     } else delete st.viewHold[s.n];
   }
-  if (anyPressed(BTN.Y)) cycleShake();
-  if (anyPressed(BTN.LB)) toggleMute();
-  if (anyPressed(BTN.RB)) { settings.house = !settings.house; save('house', settings.house); sound.sfx('move'); }
-  if (anyPressed(BTN.LT)) cycleTrip();
+  if (anyPressed(BTN.Y)) { openOptions('title'); return; }
   if (anyPressed(BTN.B)) toggleCalm();
   if (anyPressed(BTN.RT)) wantBot += 1;
   const go2 = kbStart; kbStart = false;
   if (input.activeCount >= MIN_PLAYERS && (anyPressed(BTN.X) || anyPressed(BTN.MENU) || go2)) { sound.sfx('go'); startMatch(); }
+}
+
+// ---------- options ----------
+// One focusable list instead of five shortcut buttons: every setting is
+// visible, explained at reading size, and reachable with the stick or D-pad.
+const OPTS = [
+  { label: 'EVENTS', vals: () => ['CORE 9', 'ALL 16'], get: () => (settings.set === 'all' ? 1 : 0), set: (i) => { settings.set = i ? 'all' : 'core'; save('set', settings.set); }, help: 'CORE: THE 9 MOST POLISHED EVENTS', titleOnly: true },
+  { label: 'TEXT SIZE', vals: () => ['NORMAL', 'LARGE'], get: () => (settings.large ? 1 : 0), set: (i) => { settings.large = !!i; save('large', settings.large); applyLook(); }, help: 'LARGE: BIGGER NAME TAGS AND POP-UPS' },
+  { label: 'SCREEN FIT', vals: () => FIT_LEVELS.map((f) => f.name), get: () => settings.fit, set: (i) => { settings.fit = i; save('fit', i); applyLook(); }, help: 'SHRINK IT IF YOUR TV CUTS OFF THE EDGES' },
+  { label: 'COLOR LOOK', vals: () => TRIP_LEVELS.map((l) => l.name), get: () => settings.trip, set: (i) => { settings.trip = i; save('look', i); applyLook(); fx.hueKick = TRIP_LEVELS[i].kick; }, help: 'HOW MUCH THE BACKGROUND COLOR DRIFTS' },
+  { label: 'CALM MODE', vals: () => ['OFF', 'ON'], get: () => (settings.calm ? 1 : 0), set: (i) => { settings.calm = !!i; save('calm', settings.calm); applyLook(); }, help: 'NO FLASHES, SHAKE OR DRIFT. SAME GAME' },
+  { label: 'SCREEN SHAKE', vals: () => SHAKE_LEVELS.map((l) => l.name), get: () => settings.shake, set: (i) => { settings.shake = i; save('shake', i); applyLook(); fx.shake(0.5); }, help: 'HOW HARD HITS SHAKE THE SCREEN' },
+  { label: 'SOUND', vals: () => ['ON', 'OFF'], get: () => (settings.muted ? 1 : 0), set: (i) => { settings.muted = !!i; sound.setMuted(settings.muted); save('muted', settings.muted); }, help: 'ALL SOUND ON OR OFF' },
+  { label: 'MUSIC', vals: () => MUSIC_LEVELS.map((m) => m.name), get: () => settings.music, set: (i) => { settings.music = i; save('music', i); applyLook(); }, help: 'MUSIC VOLUME. SOUND EFFECTS STAY' },
+  { label: 'HOUSE RULES', vals: () => ['OFF', 'ON'], get: () => (settings.house ? 1 : 0), set: (i) => { settings.house = !!i; save('house', settings.house); }, help: 'PROMPTS BETWEEN EVENTS. SCORES NEVER CHANGE', titleOnly: true },
+  { label: 'DONE', action: true, help: 'BACK TO THE GAME' },
+];
+function openOptions(from) { st.opts = { cur: 0, from, t: 0 }; sound.sfx('move'); }
+function closeOptions() { st.opts = null; sound.sfx('move'); }
+const optLocked = (o) => o.titleOnly && st.opts && st.opts.from === 'pause';
+function updateOptions(dt) {
+  const o = st.opts;
+  o.t += dt;
+  if (o.t < 0.2) return; // a press that opened the menu can't also change something
+  const seats = o.from === 'pause' ? seatsInMatch() : input.seats.filter((s) => s.active).map((s) => s.n);
+  for (const n of seats) {
+    const seat = seatObj(n);
+    const c = readControls(seat);
+    if (c.upP || c.downP) {
+      const step = c.upP ? -1 : 1;
+      do { o.cur = (o.cur + step + OPTS.length) % OPTS.length; } while (optLocked(OPTS[o.cur]));
+      sound.sfx('move');
+    }
+    const row = OPTS[o.cur];
+    if (seat.pressed(BTN.B) || seat.pressed(BTN.MENU) || seat.pressed(BTN.Y)) { closeOptions(); return; }
+    if (row.action) { if (seat.pressed(BTN.A)) { closeOptions(); return; } continue; }
+    const n2 = row.vals().length;
+    const d = c.leftP ? -1 : c.rightP || seat.pressed(BTN.A) ? 1 : 0;
+    if (d && !optLocked(row)) { row.set((row.get() + d + n2) % n2); sound.sfx('lock'); }
+  }
+}
+function drawOptions() {
+  const o = st.opts;
+  g.alpha(0.95); g.rect(0, 0, 320, 180, '#07060c', true); g.alpha(1);
+  g.text('OPTIONS', 160, 5, { scale: 3, col: P.warn, align: 'center' });
+  OPTS.forEach((row, k) => {
+    const y = 22 + k * 12.4;
+    const focus = o.cur === k, locked = optLocked(row);
+    if (focus) { g.rect(30, y - 2, 260, 11, P.panelHi, true); g.frame(30, y - 2, 260, 11, P.warn, 1, true); g.text('>', 24, y, { scale: 2, col: P.warn }); }
+    g.text(row.label, 36, y, { scale: 2, col: locked ? '#5a5280' : focus ? P.text : P.dim, shadow: null });
+    if (row.action) return;
+    const v = row.vals()[row.get()];
+    const txt = locked ? `${v} (TITLE ONLY)` : focus ? `< ${v} >` : v;
+    g.text(txt, 284, y, { scale: 2, col: locked ? '#5a5280' : focus ? P.warn : P.text, align: 'right', shadow: null });
+  });
+  const row = OPTS[o.cur];
+  g.text(row.help, 160, 149, { scale: 2, col: P.text, align: 'center' });
+  g.rect(0, 162, 320, 18, P.ink, true);
+  let x = 160 - 134;
+  x += prompt(g, 'STICK', 'CHOOSE', x, 166) + 10;
+  x += prompt(g, 'A', 'CHANGE', x, 166) + 10;
+  prompt(g, 'B', 'DONE', x, 166);
 }
 
 function updateDraft(controls) {
@@ -406,6 +468,23 @@ function draw() {
   }
   fx.drawFlash(g);
   if (st.paused) drawPause();
+  if (st.opts) drawOptions();
+  drawWipe();
+}
+/** A shutter that opens on each new screen: ink bands slide away, staggered. Calm mode fades instead. */
+function drawWipe() {
+  if (st.wipe <= 0) return;
+  const k = st.wipe / WIPE;
+  if (settings.calm) { g.alpha(k); g.rect(0, 0, 320, 180, P.ink, true); g.alpha(1); return; }
+  const col = st.gameId ? GAMES[st.gameId].meta.color : P.warn;
+  for (let i = 0; i < 9; i++) {
+    const w = 320 * clamp(k * 1.7 - i * 0.08, 0, 1);
+    if (w <= 0) continue;
+    const y = i * 20, left = i % 2 === 0;
+    const x = left ? 0 : 320 - w;
+    g.rect(x, y, w, 20, P.ink, true);
+    g.rect(left ? x + w - 2 : x, y, 2, 20, col, true);
+  }
 }
 
 function drawTitle() {
@@ -425,7 +504,7 @@ function drawTitle() {
     g.rect(x - 26, y, 52, 6, s.active ? SEAT_COLORS[i] : '#3a3050', true);
     if (s.state === 'empty') {
       drawPlayer(g, i, x, y, { alpha: 0.25, size: 2 });
-      if (Math.floor(t * 2) % 2) g.text('PRESS A', x, y + 10, { scale: 2, col: '#fff', align: 'center' });
+      g.alpha(0.65 + 0.35 * Math.sin(t * 3 + i)); prompt(g, 'A', 'JOIN', x, y + 10, { col: P.text, align: 'center' }); g.alpha(1); // steady, only breathes
     } else {
       const hop = s.state === 'active' ? Math.abs(Math.sin(t * 5 + i)) * 6 : 0;
       drawPlayer(g, i, x, y - hop, { size: 2, squash: hop < 1 ? 0.5 : 0, alpha: s.state === 'active' ? 1 : 0.4 });
@@ -441,8 +520,14 @@ function drawTitle() {
     g.alpha(0.4 + 0.3 * Math.sin(t * 3)); g.rect(96, 68, 128, 1, P.good, true); g.alpha(1);
   } else if (n === 1 && MIN_PLAYERS > 1) prompt(g, 'RT', 'ADD A CPU, OR A TO JOIN', 160, 59, { col: P.text, align: 'center' });
   else prompt(g, 'A', 'JOIN', 160, 59, { col: P.text, align: 'center' });
-  g.text(`Y SHAKE ${SHAKE_LEVELS[settings.shake].name}  LB SOUND ${settings.muted ? 'OFF' : 'ON'}  RB HOUSE RULES ${settings.house ? 'ON' : 'OFF'}  LT COLOR ${TRIP_LEVELS[settings.trip].name}  B CALM ${settings.calm ? 'ON' : 'OFF'}`, 160, 165, { scale: 1, col: P.dim, align: 'center' });
-  g.text('KEYS: WASD MOVE  SPACE=A  F=SHOOT  G=BLOCK  IJKL=AIM  ENTER=START  C=ADD CPU', 160, 172, { scale: 1, col: '#9a90c0', align: 'center' });
+  // settings live in OPTIONS now; the title only shows what matters before you start
+  g.rect(0, 158, 320, 22, P.ink, true);
+  let fxx = 160 - 150;
+  fxx += prompt(g, 'Y', 'OPTIONS', fxx, 161) + 10;
+  fxx += prompt(g, 'RT', 'ADD CPU', fxx, 161) + 10;
+  g.text(`${settings.set === 'all' ? 'ALL 16' : 'CORE 9'} EVENTS${settings.calm ? '  CALM' : ''}`, 310, 162, { scale: 2, col: P.dim, align: 'right', shadow: null });
+  const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter((p2) => p2 && p2.connected) : [];
+  if (!pads.length) g.text('KEYS: WASD MOVE  SPACE=A  F=SHOOT  G=BLOCK  IJKL=AIM  ENTER=START  C=ADD CPU  R=OPTIONS', 160, 173, { scale: 1, col: '#9a90c0', align: 'center' });
   g.text(BUILD, 318, 2, { scale: 1, col: '#5a5080', align: 'right' });
   if (sound.blocked && !settings.muted) g.text('SOUND STARTS AFTER YOUR FIRST BUTTON PRESS', 160, 96, { scale: 1, col: '#ffd84a', align: 'center' });
   fx.draw(g);
@@ -489,7 +574,7 @@ function drawIntro() {
     g.text(sd ? 'TIED PLAYERS ONLY. EVERYONE ELSE DROPS ANVILS' : c.rule, 160, 53, { scale: 2, col: P.text, align: 'center' });
     g.text(c.rule2, 160, 63, { scale: 2, col: P.warn, align: 'center' });
     const items = [['STICK', 'MOVE'], ...c.keys];
-    const widths = items.map(([b2, txt]) => g.textW(txt, 2) + (b2.length === 1 ? 13 : g.textW(b2, 2) + 10) + 10);
+    const widths = items.map(([b2, txt]) => g.textW(txt, 2) + (b2.length === 1 || b2.endsWith('STICK') ? 13 : g.textW(b2, 2) + 10) + 10);
     let x = 160 - widths.reduce((a2, w) => a2 + w, 0) / 2;
     items.forEach(([b2, txt], k) => { prompt(g, b2, txt, x, 82); x += widths[k]; });
     g.text('DANGER', 160 - (g.textW(c.danger, 2) + g.textW('DANGER ', 2)) / 2, 100, { scale: 2, col: P.danger });
@@ -535,9 +620,10 @@ function drawHud() {
     }
     for (let k = 0; k < p.tipsy; k++) g.rect(bx + 4 + k * 3, 12, 2, 2, '#ffb03a', true);
   });
-  if (st.twist) g.text(st.twist.name, 160, 16, { scale: 1, col: `hsl(${(performance.now() / 8) % 360},100%,70%)`, align: 'center' });
+  if (st.twist) g.text(st.twist.name, 160, 16, { scale: 1, col: P.warn, align: 'center' });
+  if (game.matchPoint && game.matchPoint() && !game.finished) { const mp = 'MATCH POINT'; const w = g.textW(mp, 1) + 6; g.rect(160 - w / 2, st.twist ? 23 : 16, w, 7, P.ink, true); g.text(mp, 160, st.twist ? 24 : 17, { scale: 1, col: P.warn, align: 'center', shadow: null }); }
   const tl = Math.ceil(game.timeLeft);
-  g.text(String(tl), 160, 2, { scale: 3, col: tl <= 5 ? (Math.floor(st.t * 4) % 2 ? '#ff5a5a' : '#fff') : '#fff', align: 'center', shadow: null });
+  g.text(String(tl), 160, 2, { scale: 3, col: tl <= 5 ? P.danger : tl <= 10 ? P.warn : '#fff', align: 'center', shadow: null });
 }
 
 /** Ring + name over each player so everyone finds themselves before play starts. */
@@ -744,8 +830,8 @@ function drawPause() {
     return;
   }
   g.text('PAUSED', 160, 40, { scale: 6, col: '#fff', align: 'center' });
-  const rows = [['A', 'RESUME'], ['X', `SCREEN SHAKE: ${SHAKE_LEVELS[settings.shake].name}`], ['LB', `SOUND: ${settings.muted ? 'OFF' : 'ON'}`], ['RB', `COLOR DRIFT: ${TRIP_LEVELS[settings.trip].name}`], ['B', `CALM MODE: ${settings.calm ? 'ON' : 'OFF'}`], ['Y', 'QUIT TO TITLE']];
-  rows.forEach(([b, txt], k) => prompt(g, b, txt, 92, 78 + k * 13, { col: P.text }));
+  const rows = [['A', 'RESUME'], ['X', 'OPTIONS'], ['B', `CALM MODE: ${settings.calm ? 'ON' : 'OFF'}`], ['Y', 'QUIT TO TITLE']];
+  rows.forEach(([b, txt], k) => prompt(g, b, txt, 104, 80 + k * 15, { col: P.text }));
 }
 
 // ---------- loop ----------
@@ -779,6 +865,6 @@ requestAnimationFrame(frame);
 
 // For automated browser checks only.
 window.__lca = {
-  st, input, fx, sound, settings, GAMES, drift, applyLook, bots,
+  st, input, fx, sound, settings, GAMES, CORE, drift, applyLook, bots, openOptions, OPTS,
   step(n = 1) { for (let i = 0; i < n; i++) update(STEP); draw(); },
 };

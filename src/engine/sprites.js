@@ -221,9 +221,31 @@ export function drawPlayer(g, idx, x, y, { flip = false, size = 1, flash = false
   if (anim.size > 400) anim.clear();
 }
 
-/** Small "P1" tag with an arrow, drawn above a player. */
+/**
+ * The gun arm: a short barrel from the body toward the aim, so everyone can
+ * read where a player is pointing (it was a 1-pixel dot). `recoil` (0..1)
+ * kicks it back and shows a muzzle flash.
+ */
+export function drawGun(g, idx, x, y, a, { size = 1, recoil = 0, alpha = 1 } = {}) {
+  const c = Math.cos(a), s = Math.sin(a);
+  const r0 = 3.5 * size, len = 6 * size - recoil * 2.5 * size;
+  const x1 = x + c * r0, y1 = y + s * r0, x2 = x + c * (r0 + len), y2 = y + s * (r0 + len);
+  g.alpha(alpha);
+  g.beam(x1, y1, x2, y2, 3.4 * size, INK);
+  g.beam(x1, y1, x2 - c * 0.6, y2 - s * 0.6, 1.8 * size, SEAT_DARK[((idx % 3) + 3) % 3]);
+  if (recoil > 0.55) { g.circle(x2 + c * 2, y2 + s * 2, 1.6 * size, '#fff6a8'); g.circle(x2 + c * 2, y2 + s * 2, 0.8 * size, '#ffffff'); }
+  g.alpha(1);
+}
+
+/** Small "P1" tag with an arrow, drawn above a player. Large text doubles it. */
 export function drawTag(g, idx, x, y) {
   const label = 'P' + (idx + 1);
+  if (g.large) {
+    g.rect(x - 9, y - 11, 18, 10, '#0b0a12', false);
+    g.text(label, x, y - 10.5, { scale: 2, col: SEAT_COLORS[idx], align: 'center', ui: false, shadow: null });
+    g.rect(x - 1, y - 1, 2, 1, SEAT_COLORS[idx], false);
+    return;
+  }
   g.rect(x - 6, y - 7, 12, 6, '#0b0a12', false);
   g.text(label, x, y - 6.5, { scale: 1, col: SEAT_COLORS[idx], align: 'center', ui: false, shadow: null });
   g.rect(x - 1, y - 1, 2, 1, SEAT_COLORS[idx], false);

@@ -1,9 +1,34 @@
 # Playtest and backlog
 
-**Build under test:** `m1-2026-11-20.8-polish` (branch `polish/rooftop-slice`). **Compared against:** `m1-2026-11-20.7` (commit `3fcacf5`), kept playable in `before/`.
+**Latest build:** `m1-2026-11-20.9-core` (branch `quality/core-pass`, not published). **Previous:** `m1-2026-11-20.8-polish` (live on the Xbox link). The rooftop slice below is compared against `m1-2026-11-20.7`, kept playable in `before/`.
 **Date:** 2026-11-20. **Environment for everything below:** Chromium browser pane on macOS, keyboard P1 + CPU P2/P3. **Nothing here was run on the Series X.**
 
-## Shipped, by finding
+## Core pass (`m1-2026-11-20.9-core`), by finding
+| Finding | What changed | Files |
+| --- | --- | --- |
+| F-15 | Orbit and Mobius are best-of rounds like Rooftop (first to 2, land a hit to take a round, ghosts and satellites return next round). One escalation per round: Orbit's fire vents wake at 8 s, Mobius's horizon saws speed up at 10 s. HUD shows round pips; "MATCH POINT" appears under the timer. | `src/game/rounds.js` (new, shared), `src/games/orbit.js`, `src/games/mobius.js` |
+| F-16 | Wormhole tiebreak: whole seconds held > hits landed > hits taken. | `src/games/wormhole.js` |
+| F-17 | Orbit has three arenas: Outpost, Twin Planets, Gas Giant. Gravity, bullets and meteors follow the nearest planet. | `src/games/orbit.js` |
+| F-18 | Game-feel kit: `fx.impact` (freeze 35–100 ms by damage, sparks along the hit, contact ring), `fx.ko`, two-layer pitch-varied hit and a heavy `hitBig`, gun arms with recoil and muzzle flash, music adds a hi-hat and octave lead in the last 10 s and at match point. | `src/engine/fx.js`, `src/engine/sprites.js`, `src/engine/audio.js`, the four shooters, `main.js` |
+| F-19 | OPTIONS screen (Y on the title, X in pause): EVENTS (Core 9 / All 16), TEXT SIZE (Large = bigger name tags and pop-ups), SCREEN FIT (100/95/90% for overscan), COLOR LOOK, CALM MODE, SCREEN SHAKE, SOUND, MUSIC volume, HOUSE RULES. Title-only rows show "(TITLE ONLY)" in pause. Title join prompt is steady. Keyboard hint only shows when no controller is connected. | `src/game/main.js` |
+| F-20 | Shutter wipe between screens (fade in Calm Mode). | `main.js` |
+| B-01 (part) | Short intro cards for all 9 core events. | `src/games/*.js` |
+| — | Core set: Rooftop, Coin Storm, Tick Tock / Orbit, Lights Out, Mirror Twins / Mobius, Wormhole, Rule Breaker. A shared `registry.js` lists every event once for the game, tests and measurement tool. Timer turns yellow at 10 and red at 5 (steady, no blink). Arena names show for the first 2.5 s of a round, then fade. | `main.js`, `src/game/registry.js` |
+
+**Measured** (details and the full 16-event table in [AUDIT.md](audit/AUDIT.md#pass-3-the-core-pass-build-m1-2026-1120-9-core-branch-qualitycore-pass-2026-11-20)):
+- Orbit 10.3 s → 33.2 s per event, idle wins 33% → 0%.
+- Mobius 14.5 s → 38.5 s, idle wins 8% → 5%.
+- Wormhole idle wins 25% → 5%.
+- A full core night with three CPUs: **6.8 min** (was ~4 min; target 5–8).
+
+**Tuning knobs:**
+- `makeRounds({ win, max, breakT, cap, time, shield })` in each event's `create()`.
+- `VENTS_AT` (Orbit) and `RUSH_AT` (Mobius) set when each round escalates.
+- `CORE` at the top of `main.js` chooses the core set.
+
+**Re-measure any time:** open `/tests/measure.html` (add `?runs=30` for more runs).
+
+## Rooftop slice (`m1-2026-11-20.8-polish`), by finding
 | Finding | What changed | Files |
 | --- | --- | --- |
 | F-01 | Rooftop is a best-of: last standing takes the round, first to 2 round wins, at most 5 rounds, 54 s cap. 1.8 s between rounds, 1 s spawn shield. Searchlight at 6 s, water rises from 9 s each round. **Land a hit to take the round.** | `src/games/rumble.js` |
@@ -52,7 +77,10 @@
 ## Tests and results
 | Check | How | Result |
 | --- | --- | --- |
-| Unit and robot suite | `/tests/` (113 tests: every game, twist, card stack, 2-player, CPU bots, drawing) | **113/113 pass** |
+| Unit and robot suite | `/tests/` (122 tests: every game, twist, card stack, 2-player, CPU bots, drawing) | **122/122 pass** (core pass) |
+| Core-pass tests | Orbit and Mobius best-of (2+ rounds, most wins first, ≤ 62 s, round pips); their sudden-death ghosts never respawn; all three Orbit arenas run; Wormhole's idle player can't win a tie; impact freeze grows with damage and is capped, no shake in Calm Mode; core set has 3 per act, cards, no repeats; every intro card fits at reading size | pass |
+| Core night, normal entry | 3 CPUs, title → podium, default options | ✔ 6.8 min, acts in order, no errors |
+| Options | keyboard pad: Y opens, down + right changes TEXT SIZE to LARGE, B closes | ✔ setting saved and applied |
 | New tests | Rooftop best-of (2+ rounds, first-to-2 ranks first, ≤ 62 s); sudden-death ghost never respawns; flash limiter + Calm Mode; drift never touches players or hazards and stays inside its amplitude | pass |
 | Join, all three seats | keyboard P1 + 2 CPUs | ✔ all active |
 | First event start → play | normal entry, `?only=rumble` | ✔ |
@@ -71,6 +99,15 @@
 - the 2-player version of the polished flow (it's covered by the robot test, but I didn't look at it)
 - sound (not audible here)
 - the House Rules prompt on the polished flow (code path unchanged)
+
+## Series X checklist: core pass (add these to the list below)
+1. Title: press **Y**. Can everyone read OPTIONS from the couch? Move with the stick and the D-pad, change a value with left/right and A, leave with B.
+2. **SCREEN FIT:** if the TV cuts off the HUD or the bottom prompts, try 95% or 90%. Note which one your TV needs.
+3. **TEXT SIZE → LARGE:** are the in-play name tags readable now? Does anything overlap?
+4. Play **Orbit Outpost** and **Mobius Loop**. Do the rounds feel like a fight rather than a coin flip? Does "MATCH POINT" add tension?
+5. **Hits:** does a big hit feel heavier than a small one? Can you see where everyone is aiming (gun arms)?
+6. Music: does it get busier in the last 10 seconds and at match point? Too much?
+7. Between screens: does the wipe feel quick (it's 0.4 s) or in the way?
 
 ## Series X checklist (10 minutes, three controllers)
 1. Open the play link. On the title: does "[X] START THE NIGHT" read from the couch? Press **B**: does CALM ON appear? Press B again.
@@ -95,18 +132,23 @@ Make a tick or a note each time it happens. Write the event name.
 ## Backlog (prioritised)
 | # | Priority | Item | Why | Finding |
 | --- | --- | --- | --- | --- |
-| B-01 | **Next** | Give every event a short `meta.card` and the scale-2 intro | The other 15 intros still carry scale-1 text (`after_intro_lounge_fallback.png`) | F-02 |
+| B-01 | **Next** | Short `meta.card` for the 7 extra events | Done for all 9 core events. The extras still use the old small-text intro | F-02 |
 | B-02 | **Next** | Route every event's backdrop through `drift.col` and its hazards through `P.danger` | Only Rooftop follows the layer rules. The rest have no drift at all now that the whole-screen filter is opt-in | F-07, F-10 |
-| B-03 | **Next** | Test best-of rounds (or a comparable "second chance") on the other fast shooters: Mobius, Orbit, Updraft | They ended in ~10 s in pass 1. The match ran ~4 min against a 5–8 min target | F-13 |
+| B-03 | Done | Best-of rounds on Orbit and Mobius | 33 s / 38 s, idle ≤ 5%. Night 6.8 min | F-13, F-15 |
 | B-04 | High | Cap live bullets and particles (and merge explosion rings) under extreme stacks | 4 ms p95 and a 49 ms spike on a Mac. The Series X browser is the unknown. The screen gets busy | perf |
-| B-05 | High | Gun arms pointing at the aim on the new characters | Aim is still a 1-pixel dot | — |
+| B-05 | Done (4 shooters) | Gun arms pointing at the aim | Rooftop, Orbit, Mobius, Wormhole. Coin Storm, Lights Out, Mirror Twins still use the old marker | F-18 |
 | B-06 | Medium | Raise platform fill contrast vs the skyline (1.22:1 today) | The edge does all the separation work | F-10 |
 | B-07 | Medium | Research a third couch reference for controller focus (not done this pass) | The brief asked for one | — |
 | B-08 | Medium | Comeback balance: give last place something extra (a 4th card or a reroll) | "Picks first" was a false promise. A real one would be better | F-06 |
 | B-09 | Low | Replace card icon letters (G/B/@) with drawn icons | Personality and scan speed | — |
-| B-10 | Low | Text-size option (200%) and button remapping | XAG 101 scaling, XAG 107 remap | a11y |
+| B-10 | Low | Button remapping | TEXT SIZE and SCREEN FIT shipped in OPTIONS. Remap (XAG 107) still open | a11y |
+| B-11 | High | Laser Lounge: idle player wins 40% | Fails the bar. Needs a "land a hit" or score-only-by-acting rule | F-21 |
+| B-12 | High | Blast Ball: idle player wins 55%, finishes last only 15% | The scoring rewards staying away from the ball | F-21 |
+| B-13 | Medium | Echo Chamber: 12.6 s, idle wins 30% | Same fix family as Orbit and Mobius (rounds) | F-21 |
+| B-14 | Medium | Updraft: ~7 s per event | Too short to matter. Rounds, or a longer climb | F-21 |
+| B-15 | Medium | Apply the feel kit (`fx.impact`, `drawGun`) and the layer palette to Coin Storm, Tick Tock, Lights Out, Mirror Twins, Rule Breaker | The core set should feel the same in every event | F-18, B-02 |
 
 ## The next three worth building
-1. **B-01 + B-02 as one pass:** every event gets the short card and the layer palette. It's mostly data and colour routing, now that the components exist.
-2. **B-03:** take the round structure that worked for Rooftop to the other quick shooters, measured the same way (length, idle wins).
-3. **B-04:** a bullet and particle budget, decided from the Series X stutter note in checklist step 9.
+1. **B-15 + B-02:** the feel kit and the layer palette on the five core events that don't have them yet, so every core event lands hits the same way.
+2. **B-08:** a real comeback for last place (a 4th card or a reroll in the draft). The draft is where ROUNDS gets its drama.
+3. **B-11 to B-14:** fix the four failing extras with the same measured method, then grow the core set past 9.

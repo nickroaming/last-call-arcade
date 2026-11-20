@@ -9,6 +9,7 @@ import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js'
 export const meta = {
   id: 'tick', name: 'TICK TOCK', color: '#ff5a3a', music: 'rumble', tier: 1,
   tagline: 'Hot potato with a live bomb',
+  card: { rule: 'DON\'T HOLD THE BOMB WHEN IT BLOWS', rule2: 'TAG SOMEONE OR THROW IT. IT STICKS', keys: [['X', 'THROW'], ['A', 'DASH'], ['RB', 'BLOCK']], danger: 'A LOOSE BOMB HUNTS THE NEAREST' },
   objective: "Don't hold the bomb when it blows. Tag someone, or THROW it: it sticks to whoever it hits.",
   controls: [['STICK', 'Move and aim'], ['X / RT', 'With bomb: throw it. Without: shoot to shove'], ['A', 'Dash'], ['RB', 'Block: tags and throws bounce off']],
   hazards: 'Conveyor belts / slippery ice / pillars the bomb ricochets off / a loose bomb hunts the nearest player / if it blows loose, the last one who touched it owns it',

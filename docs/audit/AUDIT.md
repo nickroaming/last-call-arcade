@@ -84,6 +84,46 @@ Severity: **Blocker** (breaks a game night or the TV read), **Major** (felt ever
 | F-13 | Partly (Rooftop longer) | Whole-match length not re-measured → B-03 |
 | F-14 | Kept, and ghosts return each round | ✔ |
 
+### Pass 3: the core pass (build `m1-2026-11-20.9-core`, branch `quality/core-pass`, 2026-11-20)
+Goal from the brief: make the game feel higher end. Method: measure every event the same way, keep the ones that pass a written bar, and bring the weakest of those up to Rooftop's level instead of adding more events.
+
+**Event health** ([`tests/measure.html`](../../tests/measure.html), CPU players only, 20 runs each with seat 1 idle plus 10 runs with all three active; same browser pane as above):
+
+| Event | Act | Before: avg s | Before: idle wins | After: avg s | After: idle wins | Core? |
+| --- | --- | --- | --- | --- | --- | --- |
+| Ricochet Rooftop | 1 | 28.2 | 0% | 29.3 | 0% | ✔ |
+| Coin Storm | 1 | 30.8 | 0% | 30.8 | 5% | ✔ |
+| Tick Tock | 1 | 22.3 | 0% | 21.9 | 0% | ✔ |
+| Orbit Outpost | 2 | **10.3** | **33%** | **33.2** | **0%** | ✔ (fixed) |
+| Lights Out | 2 | 35.8 | 0% | 35.8 | 0% | ✔ |
+| Mirror Twins | 2 | 47.5 | 0% | 47.5 | 0% | ✔ |
+| Mobius Loop | 3 | **14.5** | 8% | **38.5** | 5% | ✔ (fixed) |
+| Wormhole | 3 | 51.2 | **25%** | 52.4 | **5%** | ✔ (fixed) |
+| Rule Breaker | 3 | 51.2 | 0% | 51.2 | 0% | ✔ |
+| Dust Lap | 1 | 56.0 | 17% | 56.0 | 15% | extra |
+| Laser Lounge | 1 | 14.7 | 33% | 14.0 | 40% | extra |
+| Blast Ball | 1 | 51.2 | 50% | 51.2 | 55% | extra |
+| Splat City | 1 | 32.8 | 0% | 32.8 | 0% | extra |
+| Updraft | 1 | 6.6 | 0% | 6.9 | 0% | extra |
+| Echo Chamber | 3 | 13.4 | 17% | 12.6 | 30% | extra |
+| Still Life | 2 | 51.2 | 0% | 51.2 | 0% | extra |
+
+"Before" used 12 runs, "after" 20. Idle-win swings of ±10% between the two columns on untouched events are noise at these sample sizes. **The bar:** at least 20 s of play, idle player wins ≤ 15%, a short intro card, three per act. Splat City and Still Life pass the numbers but were left out to keep three per act; they stay one switch away (OPTIONS → EVENTS → ALL 16).
+
+**Whole night (core set, three CPUs, normal entry):** Rooftop → Tick Tock → Coin Storm → Lights Out → Orbit → Mobius → Rule Breaker → Wormhole, **6.8 min** title to podium (was ~4 min, target 5–8). Acts stayed in order. No errors.
+
+| ID | Scene | Sev. | Evidence | What happens | Why it matters | Change | Check | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **F-15** | Orbit, Mobius | Major (pacing, fairness) | [O] measure table | One life each: over in 10–15 s, and a player who never moved won 8–33%. | The two most distinctive shooters were the shortest and least fair things in the night. | Shared best-of rounds (`src/game/rounds.js`) with the land-a-hit rule; hazards on the round clock with one escalation per round (Orbit: fire vents at 8 s; Mobius: horizon saws speed up at 10 s). | ≥ 20 s, idle ≤ 15%, ≥ 2 rounds | Shipped ✔ (33.2 s / 0%, 38.5 s / 5%) |
+| **F-16** | Wormhole | Major (fairness) | [O] 25% idle wins, [C] `rank()` | When nobody held the orb long, "took fewer hits" decided it, so hiding won. | Rewards the opposite of the verb. | Tiebreak: whole seconds held > hits landed > hits taken. | idle ≤ 15% | Shipped ✔ (5%) |
+| **F-17** | Orbit | Minor (levels) | [C] one hard-coded planet | Every visit looked and played the same. | No reason to look forward to it twice in a night. | Three arenas: Outpost, Twin Planets (gravity switches to the nearest planet), Gas Giant. | All three run (unit test) | Shipped ✔ |
+| **F-18** | All shooters | Major (feel) | [C] `fx.stop(0.03)` everywhere, one `hit` sound, aim = 1-px dot | Every hit felt the same; you couldn't see where anyone pointed. | Hits are the core verb; they should read and land. | Shared kit: `fx.impact` (35–100 ms freeze by damage, directional sparks, contact ring), `fx.ko`, two-layer pitch-varied hit + `hitBig`, `drawGun` arm with recoil and muzzle flash. | Unit test on the freeze; visual check | Shipped (Rooftop, Orbit, Mobius, Wormhole) |
+| **F-19** | Title, pause | Major (UI) | [O] `after_lobby.png` | Five settings on five shortcut buttons in one line of scale-1 text. Empty seats' "PRESS A" blinked fully off. | Nobody can read or find them from the couch, and a stray LB mutes the game. | One OPTIONS screen (Y on the title, X in pause): focus, value arrows, a reading-size explanation per row, locked rows marked. Adds EVENTS, TEXT SIZE, SCREEN FIT and MUSIC. Steady join prompt. | Opened, changed, closed with keyboard pad ✔ | Shipped |
+| **F-20** | Every screen change | Minor (polish) | [O] | Hard cuts between title, intro, results and draft. | Cuts read as unfinished. | A 0.42 s shutter wipe in the event's colour; a plain fade in Calm Mode. | Seen mid-wipe (`core_wipe_mid.png`) ✔ | Shipped |
+| **F-21** | Lounge, Echo, Blast Ball, Updraft | Major (for those events) | [O] measure table | Idle wins 30–55% (Lounge, Echo, Blast Ball); Updraft lasts ~7 s. | Would fail the bar. | Out of the core set until fixed (backlog B-11 to B-14). | — | Backlog |
+
+**Performance** (same pane, `performance.now()` around each fixed step + draw, 600 steps per arena, active 3-player Orbit): median 0.3–0.4 ms, p95 0.7–1.7 ms. Every arena showed one ~41 ms step about every 1.2 s. It also appears when **only drawing** a still screen, and the old build shows more of it (22 spikes, max 67 ms, on its title screen), so it is the hidden browser pane's canvas flush, not game code. **[A]** The real Series X frame pacing is still unmeasured.
+
 ### Matched before / after
 | Screen | Sheet | What to look at |
 | --- | --- | --- |
@@ -94,6 +134,10 @@ Severity: **Blocker** (breaks a game night or the TV read), **Major** (felt ever
 | Results | `captures/compare_results.png` | Two small fine-print lines → three readable lines |
 | Draft | `captures/compare_draft.png` | Three equal small cards → one expanded focus card, LOCKED stamp, "WAITING ON P1" |
 | Studies | `captures/study_A_vs_B_rumble.png` | CALM vs BOLD drift at the peaks of each cycle |
+| Orbit intro (core pass) | `captures/compare_core_orbit_intro.png` | Small text boxes → short card |
+| Orbit play (core pass) | `captures/compare_core_orbit_play.png` | One life → rounds with pips and MATCH POINT, gun arms, upright health bars |
+| Mobius (core pass) | `captures/compare_core_mobius.png` | Strobing horizon → calm line; round banner explains a land-a-hit decision |
+| Title (core pass) | `captures/compare_core_title.png` | Tiny settings line → OPTIONS prompt; steady join prompt |
 
 ### Assumptions and open questions
 - **[A]** Text size math assumes the 640×360 canvas fills a 1080p TV (Edge full screen). If Edge shows its address bar, the game is a little smaller still.

@@ -21,7 +21,10 @@ export class Sound {
     this.step = 0;
     this.nextTime = 0;
     this.timer = null;
+    this.intensity = 0;   // 0 calm, 1 climax: adds a hi-hat line and an octave lead
+    this.musicVol = 1;    // options: music volume
   }
+  setMusicVol(v) { this.musicVol = v; if (this.musicGain) this.musicGain.gain.value = 0.38 * v; }
   get blocked() { return !this.ctx || this.ctx.state !== 'running'; }
   /** Call on any input; browsers only allow audio after a user action. */
   ensure() {
@@ -34,7 +37,7 @@ export class Sound {
         this.master.gain.value = this.muted ? 0 : 0.32;
         this.master.connect(this.ctx.destination);
         this.musicGain = this.ctx.createGain();
-        this.musicGain.gain.value = 0.38;
+        this.musicGain.gain.value = 0.38 * this.musicVol;
         this.musicGain.connect(this.master);
       }
       if (this.ctx.state === 'suspended') this.ctx.resume();
@@ -82,8 +85,10 @@ export class Sound {
     const t = this.ctx.currentTime;
     switch (name) {
       case 'jump': this.tone({ f: 260, f2: 520, dur: 0.09, vol: 0.12 }); break;
-      case 'shoot': this.tone({ f: 900, f2: 200, dur: 0.08, vol: 0.13 }); this.noise({ dur: 0.04, vol: 0.08, hp: 2000 }); break;
-      case 'hit': this.tone({ f: 180, f2: 60, type: 'sawtooth', dur: 0.14, vol: 0.25 }); this.noise({ dur: 0.1, vol: 0.2, lp: 2000 }); break;
+      case 'shoot': { const v = 0.9 + Math.random() * 0.2; this.tone({ f: 900 * v, f2: 200 * v, dur: 0.08, vol: 0.13 }); } this.noise({ dur: 0.04, vol: 0.08, hp: 2000 }); break;
+      // a hit is two layers: a body thump and a pitch-varied crack, so ten hits in a row don't sound like one
+      case 'hit': { const v = 0.88 + Math.random() * 0.24; this.tone({ f: 110 * v, f2: 45, type: 'sine', dur: 0.12, vol: 0.4 }); this.tone({ f: 190 * v, f2: 70, type: 'sawtooth', dur: 0.1, vol: 0.18 }); this.noise({ dur: 0.07, vol: 0.2, hp: 2500 }); break; }
+      case 'hitBig': this.tone({ f: 90, f2: 32, type: 'sine', dur: 0.22, vol: 0.55 }); this.tone({ f: 160, f2: 50, type: 'sawtooth', dur: 0.16, vol: 0.22 }); this.noise({ dur: 0.16, vol: 0.3, hp: 1800 }); this.noise({ dur: 0.2, vol: 0.2, lp: 500 }); break;
       case 'block': this.tone({ f: 1200, f2: 1500, type: 'triangle', dur: 0.12, vol: 0.2 }); break;
       case 'boom': this.noise({ dur: 0.5, vol: 0.45, lp: 900 }); this.tone({ f: 120, f2: 30, type: 'sine', dur: 0.45, vol: 0.5 }); break;
       case 'ko': this.noise({ dur: 0.7, vol: 0.5, lp: 1200 }); this.tone({ f: 400, f2: 40, type: 'sawtooth', dur: 0.6, vol: 0.3 }); break;
@@ -150,6 +155,11 @@ export class Sound {
       const d = deg + arp[(step >> (th.drums >= 2 ? 0 : 1)) % arp.length];
       this.tone({ f: midi(note(d) + 12), type: th.lead, dur: sd * 0.9, vol: 0.07, at, dest });
     }
+    // climax layer: the last seconds and match point get busier, not louder
+    if (this.intensity > 0.5) {
+      this.noise({ dur: 0.025, vol: 0.05, at, hp: 8000, dest });
+      if (s % 4 === 2) this.tone({ f: midi(note(deg + 4) + 24), type: 'square', dur: sd * 0.7, vol: 0.035, at, dest });
+    }
     // drums
     if (th.drums) {
       if (s % 8 === 0) this.tone({ f: 150, f2: 40, type: 'sine', dur: 0.12, vol: 0.5, at, dest });
@@ -161,4 +171,4 @@ export class Sound {
 }
 
 /** Silent stand-in for tests. */
-export const NO_SOUND = { sfx() {}, music() {}, ensure() {}, setMuted() {}, blocked: false, muted: true };
+export const NO_SOUND = { sfx() {}, music() {}, ensure() {}, setMuted() {}, setMusicVol() {}, blocked: false, muted: true, intensity: 0 };

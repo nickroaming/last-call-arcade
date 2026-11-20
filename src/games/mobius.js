@@ -3,19 +3,22 @@
 // UP onto the ceiling. Walk (or shoot) off a side edge and you come out the
 // other side on the opposite surface, upside down: the arena is a Mobius strip.
 import { TAU, clamp, rand, approach, overlap, circleRect } from '../engine/util.js';
-import { drawPlayer, drawTag, SEAT_COLORS } from '../engine/sprites.js';
+import { drawPlayer, drawTag, drawGun, SEAT_COLORS } from '../engine/sprites.js';
 import { Guns, newGunState, hitEffects, tickStatus } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
+import { Drift, P } from '../engine/style.js';
+import { makeRounds } from '../game/rounds.js';
 
 export const meta = {
   id: 'mobius', name: 'MOBIUS LOOP', color: '#c86bff', music: 'rumble', tier: 3,
   tagline: 'Two floors. Gravity picks the closer one.',
-  objective: 'Last one standing. Double jump past the horizon to fall UP. Side edges flip you over.',
+  objective: 'Last one standing takes the round, if they landed a hit. First to 2. Double jump past the horizon to fall UP.',
+  card: { rule: 'DOUBLE JUMP PAST THE MIDDLE: FALL UP', rule2: 'LAST STANDING + A HIT = ROUND. FIRST TO 2', keys: [['A', 'JUMP X2'], ['X', 'SHOOT'], ['RB', 'BLOCK']], danger: 'HORIZON SAWS, SPIKES, SIDE EDGES FLIP' },
   controls: [['STICK', 'Move and aim'], ['A', 'Jump (x2 = fall up)'], ['X / RT', 'Shoot (bullets curve)'], ['RB', 'Block'], ['R-STICK', 'Aim freely']],
-  hazards: 'Horizon saws / spikes arm on the floor OR ceiling / side edges flip you and bullets',
-  ghost: 'Knocked out: fly your ghost, X drops a gravity bomb',
-  tiebreak: 'Standing > more health > knocked out later',
+  hazards: 'Horizon saws (faster from 10 s each round) / spikes arm on the floor OR ceiling / side edges flip you and bullets',
+  ghost: 'Knocked out: fly your ghost, X drops a gravity bomb. Back next round',
+  tiebreak: 'More round wins > longer survived > more health',
   gunUse: 'Your gun (bullets curve toward the floor or ceiling)', blockUse: 'Your block (RB)', bodyUse: 'Your body and jumps',
   twists: ['moon', 'heavy', 'wind', 'rubber', 'bullettime', 'giant', 'hyper', 'ice'],
 };
@@ -23,7 +26,7 @@ export const meta = {
 const TOP = 16, BOT = 180, MID = (TOP + BOT) / 2;
 const GRAV = 560;
 const HAZ = 30;
-const TIME = 45;
+const RUSH_AT = 10;   // each round's escalation: the horizon saws speed up
 const mirrorY = (y, h = 0) => TOP + BOT - y - h;
 
 const LAYOUTS = [
@@ -48,7 +51,8 @@ export function create(ctx) {
   const fx = ctx.fx, sound = ctx.sound, tw = ctx.twist || null;
   const L = LAYOUTS[ctx.variant % LAYOUTS.length];
   const solids = L.solids.map((s) => ({ ...s }));
-  let t = 0, endT = null;
+  let t = 0;
+  const drift = ctx.drift || new Drift();
   let env = twistEnv(tw, 0);
   const spawns = [[50, 'floor'], [270, 'floor'], [160, 'ceil']];
 
@@ -59,7 +63,7 @@ export function create(ctx) {
     const b = { x: sx - w / 2, y: side === 'floor' ? 164 - h : 32, w, h, vx: 0, vy: 0, onGround: false, jumps: 1, coyote: 0, buffer: 0, stun: 0, squash: 0, dir: side === 'floor' ? 1 : -1 };
     const p = {
       seat: pl.seat, idx: pl.idx, b, hp: st.hp, maxHp: st.hp,
-      dead: !!pl.ghost, deathT: pl.ghost ? -1 : null, face: sx < 160 ? 1 : -1, gs: newGunState(st.gun), mult: pl.pickupMult ?? 1,
+      dead: !!pl.ghost, deathT: pl.ghost ? -1 : null, perma: !!pl.ghost, recoil: 0, face: sx < 160 ? 1 : -1, gs: newGunState(st.gun), mult: pl.pickupMult ?? 1,
       blockT: 0, blockCd: 0, shields: st.shields, hurtT: 0, flashT: 0, slowT: 0, poison: null,
       ghost: { x: sx, y: MID, cd: pl.ghost ? 1 : 0 },
     };
@@ -72,6 +76,18 @@ export function create(ctx) {
   const stars = Array.from({ length: 50 }, () => ({ x: rand(0, 320), y: rand(TOP, BOT), s: rand(0.3, 1) }));
   const game = { meta, finished: false, ranking: [], players, layoutName: L.name };
   const alive = () => players.filter((p) => !p.dead);
+  let rushSaid = false;
+  const R = makeRounds({
+    players, fx, sound, drift, cap: 22, time: 54,
+    onReset: (p, k, round) => {
+      const [sx, side] = spawns[(k + round - 1) % 3];
+      const b = p.b;
+      b.x = sx - b.w / 2; b.y = side === 'floor' ? 164 - b.h : 32; b.vx = 0; b.vy = 0; b.stun = 0; b.dir = side === 'floor' ? 1 : -1; b.onGround = true;
+      p.hurtT = R.shield; p.blockT = 0; p.ghost.cd = 0; p.face = sx < 160 ? 1 : -1;
+      fx.ring(sx, side === 'floor' ? 158 : 38, 16, SEAT_COLORS[p.idx], 0.5);
+      spikes.armed = false; spikes.warn = 0; spikes.next = 6; bombs.length = 0; guns.bullets.length = 0; rushSaid = false;
+    },
+  });
 
   function solidAt(x, y) {
     for (const s of solids) if (x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h) return { rect: s };
@@ -83,9 +99,9 @@ export function create(ctx) {
     if (p.blockT > 0) { fx.ring(cx, cy, 12, '#9ff'); sound.sfx('block'); return 'blocked'; }
     if (p.shields > 0) { p.shields -= 1; p.hurtT = 0.4; fx.popup('AIRBAG!', cx, cy - 12, '#9fd3ff', 1); sound.sfx('block'); return 'blocked'; }
     p.hp -= dmg; p.hurtT = inv; p.flashT = 0.12;
+    if (src && src !== p && src.dealt !== undefined) src.dealt += dmg;
     p.b.vx += kx * p.st.knockTaken; p.b.vy += ky * p.st.knockTaken; p.b.stun = 0.22;
-    fx.shake(0.12 + Math.min(0.3, dmg / 200)); fx.stop(0.03); sound.sfx('hit');
-    fx.burst(cx, cy, 8, SEAT_COLORS[p.idx], { speed: 90, life: 0.4 });
+    fx.impact(cx, cy, { dmg, col: SEAT_COLORS[p.idx], dx: kx, dy: ky }); sound.sfx(dmg >= 30 ? 'hitBig' : 'hit');
     fx.popup(String(Math.round(dmg)), cx, cy - 8, '#fff', 1);
     if (g && src) hitEffects(p, src, dmg, g);
     if (p.hp <= 0) kill(p);
@@ -94,9 +110,7 @@ export function create(ctx) {
   function kill(p) {
     p.dead = true; p.deathT = t; p.hp = 0;
     const [cx, cy] = p.pos();
-    fx.burst(cx, cy, 34, SEAT_COLORS[p.idx], { speed: 160, life: 0.8, size: 2 });
-    fx.ring(cx, cy, 30, '#fff', 0.5); fx.slow(0.45); fx.shake(0.7); fx.flash('#c86bff', 0.35); sound.sfx('ko');
-    fx.hueKick = (fx.hueKick || 0) + 30;
+    fx.ko(cx, cy, SEAT_COLORS[p.idx]); sound.sfx('ko'); drift.hush(0.7);
     fx.popup(`P${p.idx + 1} OUT!`, cx, cy - 16, SEAT_COLORS[p.idx], 3);
     p.ghost.x = cx; p.ghost.y = MID;
   }
@@ -193,12 +207,13 @@ export function create(ctx) {
 
   function hazards(dt) {
     for (const s of saws) {
-      s.x = (s.x + s.v * (t > 25 ? 1.6 : 1) * dt) % 320;
+      s.x = (s.x + s.v * (R.roundT > RUSH_AT ? 1.7 : 1) * dt) % 320;
       for (const p of alive()) if (circleRect(s.x, MID, s.r, p.b)) hurt(p, HAZ, (p.b.x + p.b.w / 2 < s.x ? -1 : 1) * 160, 220 * (p.b.y + p.b.h / 2 < MID ? -1 : 1));
     }
+    if (R.roundT > RUSH_AT && !rushSaid) { rushSaid = true; fx.popup('THE HORIZON SPEEDS UP', 160, MID - 22, P.danger, 2); sound.sfx('warn'); }
     // spike strips: warn, arm on one surface, swap
-    if (!spikes.armed && t >= spikes.next) {
-      if (spikes.warn <= 0) { spikes.warn = 1.1; spikes.side = Math.random() < 0.5 ? 1 : -1; sound.sfx('warn'); fx.popup(spikes.side > 0 ? 'FLOOR SPIKES!' : 'CEILING SPIKES!', 160, spikes.side > 0 ? 150 : 46, '#ff5a5a', 2); }
+    if (!spikes.armed && R.roundT >= spikes.next) {
+      if (spikes.warn <= 0) { spikes.warn = 1.1; spikes.side = Math.random() < 0.5 ? 1 : -1; sound.sfx('warn'); fx.popup(spikes.side > 0 ? 'FLOOR SPIKES!' : 'CEILING SPIKES!', 160, spikes.side > 0 ? 150 : 46, P.danger, 2); }
       spikes.warn -= dt;
       if (spikes.warn <= 0) { spikes.armed = true; spikes.t = 2.6; sound.sfx('zap'); }
     } else if (spikes.armed) {
@@ -209,7 +224,7 @@ export function create(ctx) {
         const onFloorLine = spikes.side > 0 ? p.b.y + p.b.h >= 163 : p.b.y <= 33;
         if (onFloorLine && STRIPS.some(([a, z]) => cx > a && cx < z)) { if (hurt(p, HAZ, 0, -260 * spikes.side) !== 'none') sound.sfx('zap'); }
       }
-      if (spikes.t <= 0) { spikes.armed = false; spikes.next = t + rand(3, 5); }
+      if (spikes.t <= 0) { spikes.armed = false; spikes.next = R.roundT + rand(3, 5); }
     }
     for (let i = bombs.length - 1; i >= 0; i--) {
       const a = bombs[i];
@@ -229,14 +244,17 @@ export function create(ctx) {
   game.update = (dt, controls) => {
     t += dt;
     env = { ...twistEnv(tw, t), ice: tw && tw.ice };
-    for (const s of stars) { s.x -= s.s * 6 * dt; if (s.x < 0) s.x += 320; }
+    for (const p of players) p.recoil *= Math.pow(0.0001, dt);
+    const phase = R.tick(dt);
+    if (phase === 'done') { if (!game.finished) { game.finished = true; game.ranking = R.rank(); } return; }
+    if (phase !== 'play') { wrapBullets(); guns.update(dt); wrapBullets(); return; }
     hazards(dt);
     for (const p of players) {
       const c = controls.get(p.seat);
       if (p.dead) {
         const gh = p.ghost;
         gh.x = clamp(gh.x + c.mx * 150 * dt, 6, 314); gh.y = clamp(gh.y + c.my * 150 * dt, 40, 156); gh.cd -= dt;
-        if (c.fireP && gh.cd <= 0 && endT === null) { bombs.push({ x: gh.x, y: gh.y, vy: 0, dir: gh.y < MID ? -1 : 1, warn: 0.6 }); gh.cd = 3.5; sound.sfx('warn'); }
+        if (c.fireP && gh.cd <= 0) { bombs.push({ x: gh.x, y: gh.y, vy: 0, dir: gh.y < MID ? -1 : 1, warn: 0.6 }); gh.cd = 3.5; sound.sfx('warn'); }
         continue;
       }
       tickBuffs(p, dt);
@@ -252,23 +270,20 @@ export function create(ctx) {
       else a = p.face > 0 ? 0 : Math.PI;
       p.aim = a;
       const [cx, cy] = p.pos();
-      if (guns.trigger(p, p.gs, p.st.gun, c.fire, a, cx + Math.cos(a) * 5, cy + Math.sin(a) * 5, dt)) { p.b.vx -= Math.cos(a) * 30 * Math.sqrt(p.st.gun.knock); p.b.squash = 0.2; }
+      if (guns.trigger(p, p.gs, p.st.gun, c.fire, a, cx + Math.cos(a) * 9, cy + Math.sin(a) * 9, dt)) { p.b.vx -= Math.cos(a) * 30 * Math.sqrt(p.st.gun.knock); p.b.squash = 0.2; p.recoil = 1; }
       step(p, dt);
     }
     wrapBullets();
     guns.update(dt);
     wrapBullets();
     pickups.update(dt, alive().map((p) => { const [x, y] = p.pos(); return { p, x, y, r: p.b.w / 2 + 2, mult: p.mult }; }));
-    const solo = players.filter((p) => p.deathT !== -1).length <= 1;
-    if (endT === null && ((!solo && alive().length <= 1) || t >= TIME)) endT = 1.3;
-    if (endT !== null) { endT -= dt; if (endT <= 0 && !game.finished) { game.finished = true; game.ranking = rank(); } }
+    R.check(dt);
   };
-  function rank() {
-    const a = players.filter((p) => !p.dead).sort((x, y) => y.hp / y.maxHp - x.hp / x.maxHp);
-    const d = players.filter((p) => p.dead).sort((x, y) => y.deathT - x.deathT);
-    return [...a, ...d].map((p) => p.seat);
-  }
-  game.hud = (seat) => { const p = players.find((x) => x.seat === seat); return p.dead ? 'GHOST' : `${Math.max(0, Math.ceil((p.hp / p.maxHp) * 100))}%` + (p.b.dir < 0 ? ' UP' : ''); };
+  game.hud = R.hud;
+  game.hudInfo = (seat) => R.hudInfo(seat, 'GHOST');
+  game.leader = R.leader;
+  game.matchPoint = R.matchPoint;
+  Object.defineProperty(game, 'round', { get: () => R.round });
   game.botTarget = (seat) => {
     const p = players.find((x) => x.seat === seat);
     if (!p || p.dead) return null;
@@ -277,42 +292,47 @@ export function create(ctx) {
     for (const o of alive()) { if (o === p) continue; const [ox, oy] = o.pos(); const d = Math.hypot(ox - p.b.x, oy - p.b.y); if (d < bd) { bd = d; best = [ox, oy]; } }
     return best;
   };
-  Object.defineProperty(game, 'timeLeft', { get: () => Math.max(0, TIME - t) });
+  Object.defineProperty(game, 'timeLeft', { get: () => R.timeLeft() });
 
   game.draw = (g) => {
     // two skies: the ceiling world is the floor world's negative
-    g.rect(0, 0, 320, MID, '#1d0b2e', true);
-    g.rect(0, MID, 320, 180 - MID, '#0b1d2e', true);
-    for (const s of stars) { const up = s.y < MID; g.rect(s.x, s.y, 1, 1, up ? '#ff9ae8' : '#9ae8ff', true); }
-    // the horizon
-    for (let x = 0; x < 320; x += 2) g.rect(x, MID + Math.sin(x * 0.08 + t * 3) * 1.5, 2, 1, Math.floor(x / 2 + t * 20) % 6 < 3 ? '#c86bff' : '#ffd84a');
-    g.text(L.name, 160, MID - 12, { scale: 1, col: '#c86bff88', align: 'center', ui: false, shadow: null });
-    // edge markers: leaving here flips you
-    for (const ex of [1, 316]) for (let y = 40; y < 160; y += 16) g.text(y < MID ? 'v' : '^', ex + 1, y, { scale: 1, col: Math.floor(t * 4 + y / 16) % 2 ? '#c86bff' : '#5a2a7a', align: 'center', ui: false, shadow: null });
+    const D = (c, layer = 'bg') => drift.col(c, layer);
+    // L0: two skies, the ceiling world is the floor world's negative. Stars hold still.
+    g.rect(0, 0, 320, MID, D('#1d0b2e'), true);
+    g.rect(0, MID, 320, 180 - MID, D('#0b1d2e'), true);
+    for (const s of stars) { const up = s.y < MID; g.rect(s.x, s.y, 1, 1, D(up ? '#7a4a8a' : '#3a6a8a'), true); }
+    g.text(L.name, 160, MID - 12, { scale: 2, col: D('#3a1d5a'), align: 'center', ui: false, shadow: null });
+    // the horizon: a calm line that tells you where gravity changes sides
+    g.alpha(0.5); g.rect(0, MID - 1, 320, 3, '#c86bff'); g.alpha(1);
+    for (let x = 0; x < 320; x += 2) g.rect(x, MID + Math.sin(x * 0.08 + t * 1.5) * 1, 2, 1, '#e8c8ff');
+    // edge markers: leaving here flips you (steady arrows, no strobe)
+    for (const ex of [2, 316]) for (let y = 40; y < 160; y += 16) g.text(y < MID ? 'v' : '^', ex + 1, y, { scale: 1, col: '#8a5ab0', align: 'center', ui: false, shadow: null });
+    // L1 geometry: fill drifts a little, the standing edge is fixed and bright
     for (const s of solids) {
       const up = s.y + s.h / 2 < MID;
-      g.rect(s.x, s.y, s.w, s.h, up ? '#3a1d4e' : '#1d3a4e');
-      g.rect(s.x, up ? s.y + s.h - 2 : s.y, s.w, 2, up ? '#ff9ae8' : '#9ae8ff');
+      g.rect(s.x, s.y, s.w, s.h, D(up ? '#3a1d4e' : '#1d3a4e', 'geo'));
+      g.rect(s.x, up ? s.y + s.h - 2 : s.y, s.w, 2, up ? '#ffc8f0' : '#c8f0ff');
     }
     // spike strips
     for (const [a, z] of STRIPS) for (const side of [1, -1]) {
-      const live = spikes.armed && spikes.side === side, warn = !spikes.armed && spikes.warn > 0 && spikes.side === side && Math.floor(t * 12) % 2;
+      const live = spikes.armed && spikes.side === side, warn = !spikes.armed && spikes.warn > 0 && spikes.side === side;
       const y = side > 0 ? 164 : 32;
       for (let x = a; x < z; x += 6) {
         const h = live ? 5 : warn ? 3 : 1;
-        g.rect(x + 1, side > 0 ? y - h : y, 3, h, live ? '#ff5a5a' : warn ? '#ffd84a' : '#5a5a7a');
+        g.rect(x + 1, side > 0 ? y - h : y, 3, h, live ? P.danger : warn ? P.warn : '#5a5a7a');
       }
     }
     for (const s of saws) {
       for (const dx of [0, -320, 320]) {
         const x = s.x + dx; if (x < -10 || x > 330) continue;
-        g.circle(x, MID, s.r, '#e8e8f0');
-        for (let k = 0; k < 8; k++) { const a = t * 12 + (k / 8) * TAU; g.rect(x + Math.cos(a) * (s.r + 1) - 1, MID + Math.sin(a) * (s.r + 1) - 1, 2, 2, '#fff'); }
-        g.circle(x, MID, s.r * 0.35, '#c86bff');
+        g.alpha(0.25); g.circle(x, MID, s.r + 3, P.danger); g.alpha(1);
+        g.circle(x, MID, s.r, '#e8e4f0');
+        for (let k = 0; k < 8; k++) { const a = t * 12 + (k / 8) * TAU; g.rect(x + Math.cos(a) * (s.r + 1) - 1, MID + Math.sin(a) * (s.r + 1) - 1, 2, 2, P.danger); }
+        g.circle(x, MID, s.r * 0.35, '#3a1010');
       }
     }
     for (const a of bombs) {
-      if (a.warn > 0) g.ring(a.x, a.y, 6 + Math.sin(t * 20) * 2, '#ff5a5a');
+      if (a.warn > 0) g.ring(a.x, a.y, 7, P.danger);
       g.circle(a.x, a.y, 5, '#2a1040'); g.ring(a.x, a.y, 5, '#c86bff');
     }
     pickups.draw(g);
@@ -320,23 +340,27 @@ export function create(ctx) {
     for (const p of players) {
       if (p.dead) continue;
       const b = p.b, cx = b.x + b.w / 2, up = b.dir < 0;
-      const blink = p.hurtT > 0 && p.hurtT < 0.5 && Math.floor(t * 20) % 2;
-      drawPlayer(g, p.idx, cx, up ? b.y : b.y + b.h, { flip: p.face < 0, size: p.st.size, flash: p.flashT > 0, alpha: blink ? 0.5 : 1, squash: b.squash, flipY: up });
+      const shielded = p.hurtT > 0 && R.roundT < R.shield + 0.05;
+      const blink = !shielded && p.hurtT > 0 && p.hurtT < 0.5 && Math.floor(t * 8) % 2;
+      drawPlayer(g, p.idx, cx, up ? b.y : b.y + b.h, { flip: p.face < 0, size: p.st.size, flash: p.flashT > 0, alpha: blink ? 0.6 : 1, squash: b.squash, flipY: up, look: p.aim });
       const cy = b.y + b.h / 2;
+      drawGun(g, p.idx, cx, cy, p.aim || 0, { size: p.st.size, recoil: p.recoil });
+      if (shielded) { g.alpha(0.5); g.ring(cx, cy, 11 * p.st.size, SEAT_COLORS[p.idx]); g.alpha(1); }
       if (p.blockT > 0) g.ring(cx, cy, 10 * p.st.size, '#5affd9');
       if (p.shields) g.ring(cx, cy, 8 * p.st.size, '#9fd3ff55');
       const barY = up ? b.y + b.h + 3 : b.y - 3;
-      g.rect(cx - 7, barY, 14, 2, '#3a1020'); g.rect(cx - 7, barY, 14 * Math.max(0, p.hp / p.maxHp), 2, p.poison && p.poison.t > 0 ? '#9aff5a' : '#ff5a5a');
-      g.rect(cx + Math.cos(p.aim || 0) * 9 - 0.5, cy + Math.sin(p.aim || 0) * 9 - 0.5, 1, 1, '#fff');
+      g.rect(cx - 8, barY, 16, 3, '#3a1020'); g.rect(cx - 8, barY, 16 * Math.max(0, p.hp / p.maxHp), 3, p.poison && p.poison.t > 0 ? '#9aff5a' : SEAT_COLORS[p.idx]);
       drawBuffs(g, p, cx, up ? b.y + b.h + 8 : b.y - 6);
       drawTag(g, p.idx, cx, up ? b.y + b.h + 14 : b.y - 5);
     }
     for (const p of players) {
-      if (!p.dead || game.finished) continue;
+      if (!p.dead || game.finished || R.between > 0) continue;
       const gh = p.ghost;
       drawPlayer(g, p.idx, gh.x, gh.y + 6 + Math.sin(t * 4 + p.idx) * 2, { alpha: 0.5, size: 0.9, flipY: gh.y < MID });
-      g.text(gh.cd <= 0 ? `P${p.idx + 1} X:BOMB` : `P${p.idx + 1}`, gh.x, gh.y - 14, { scale: 1, col: SEAT_COLORS[p.idx], align: 'center', ui: false });
+      g.text(gh.cd <= 0 ? `P${p.idx + 1} X:BOMB` : `P${p.idx + 1}`, gh.x, gh.y - 14, { scale: g.large ? 2 : 1, col: SEAT_COLORS[p.idx], align: 'center', ui: false });
     }
+    R.draw(g);
   };
+  R.reset();
   return game;
 }

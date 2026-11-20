@@ -23,6 +23,7 @@ export class Fx {
     this.flashCol = '#fff';
     this.lastFlash = -9;
     this.calm = false; // reduced motion: no flashes, no shake
+    this.large = false; // large text: pop-ups never smaller than reading size
     this.t = 0;
   }
   reset() { this.parts.length = 0; this.popups.length = 0; this.rings.length = 0; this.trauma = 0; this.hitstop = 0; this.slowT = 0; this.flashA = 0; }
@@ -49,6 +50,26 @@ export class Fx {
     if (this.t - this.lastFlash < FLASH_GAP) return;
     this.lastFlash = this.t;
     this.flashCol = col; this.flashA = Math.max(this.flashA, Math.min(a, FLASH_MAX));
+  }
+  /**
+   * A hit that matters, in one call (the shared game-feel kit). The freeze
+   * grows with damage (35-100 ms), sparks fly the way the hit travelled, and a
+   * small white ring marks the contact point. Games add their own sound.
+   */
+  impact(x, y, { dmg = 20, col = '#fff', dx = 0, dy = 0 } = {}) {
+    this.stop(Math.min(0.1, 0.035 + dmg / 500));
+    this.shake(0.12 + Math.min(0.3, dmg / 200));
+    const a = dx || dy ? Math.atan2(dy, dx) : -Math.PI / 2;
+    this.burst(x, y, 6, '#ffffff', { speed: 150, life: 0.22, angle: a, spread: 1.1, drag: 4 });
+    this.burst(x, y, 7, col, { speed: 90, life: 0.4 });
+    this.ring(x, y, 7 + Math.min(10, dmg / 5), '#ffffff', 0.16);
+  }
+  /** A knockout: the biggest moment in a fight, so the biggest effect. */
+  ko(x, y, col) {
+    this.burst(x, y, 34, col, { speed: 160, life: 0.8, size: 2 });
+    this.burst(x, y, 14, '#fff', { speed: 120, life: 0.5 });
+    this.ring(x, y, 30, '#fff', 0.5); this.ring(x, y, 46, col, 0.7);
+    this.stop(0.09); this.slow(0.45); this.shake(0.7); this.flash('#fff', 0.35);
   }
   popup(text, x, y, col = '#fff', scale = 2) { this.popups.push({ text, x, y, col, scale, life: 0.9 }); }
 
@@ -100,7 +121,7 @@ export class Fx {
     }
     for (const p of this.popups) {
       g.alpha(Math.min(1, p.life * 3));
-      g.text(p.text, p.x, p.y, { scale: p.scale, col: p.col, align: 'center', ui: false });
+      g.text(p.text, p.x, p.y, { scale: this.large ? Math.max(2, p.scale) : p.scale, col: p.col, align: 'center', ui: false });
       g.alpha(1);
     }
   }

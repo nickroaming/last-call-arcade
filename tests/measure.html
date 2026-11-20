@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Last Call Arcade · event health</title>
+<style>
+  body { font: 15px system-ui, sans-serif; background: #111; color: #eee; padding: 20px; }
+  table { border-collapse: collapse; } td, th { padding: 4px 10px; border-bottom: 1px solid #333; text-align: right; }
+  th:first-child, td:first-child { text-align: left; } .bad { color: #ff6a6a; } .ok { color: #7dff8a; }
+</style>
+</head>
+<body>
+<h1>Event health</h1>
+<p>CPU players only. "Idle" = seat 1 never touches the controller.</p>
+<div id="out">Measuring…</div>
+<script type="module">
+  import { measureAll } from './measure.js';
+  const runs = +(new URLSearchParams(location.search).get('runs') || 20);
+  setTimeout(() => {
+    const rows = measureAll(runs);
+    window.__measure = rows;
+    const flag = (v, bad) => `<td class="${bad ? 'bad' : 'ok'}">${v}</td>`;
+    document.getElementById('out').innerHTML = `<table><tr><th>Event</th><th>Act</th><th>Avg s</th><th>Min</th><th>Max</th><th>Idle wins %</th><th>Idle last %</th><th>Rounds</th></tr>` +
+      rows.map((r) => `<tr><td>${r.name}</td><td>${r.tier}</td>${flag(r.avgSecs, r.avgSecs < 20)}<td>${r.minSecs}</td><td>${r.maxSecs}</td>${flag(r.idleWinPct, r.idleWinPct > 15)}${flag(r.idleLastPct, r.idleLastPct < 60)}<td>${r.rounds}</td></tr>`).join('') + '</table>';
+  }, 50);
+</script>
+</body>
+</html>

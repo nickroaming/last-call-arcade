@@ -9,6 +9,7 @@ import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js'
 export const meta = {
   id: 'coins', name: 'COIN STORM', color: '#ffd84a', music: 'coins', tier: 1,
   tagline: "It's raining money",
+  card: { rule: 'GRAB THE MOST COINS', rule2: 'SHOOT OR STOMP RIVALS TO KNOCK COINS LOOSE', keys: [['A', 'JUMP'], ['X', 'SHOOT'], ['RB', 'BLOCK']], danger: 'LIGHTNING, BARRELS, SPIKE BALL' },
   objective: 'Grab the most coins. Shoot rivals and stomp their heads to knock coins loose.',
   controls: [['STICK', 'Move and aim'], ['A', 'Jump (double jump)'], ['X / RT', 'Shoot: hits knock coins loose'], ['RB', 'Block']],
   hazards: 'Lightning strikes / rolling barrels / a swinging spike ball / moving platforms',

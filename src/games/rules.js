@@ -12,6 +12,7 @@ import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js'
 export const meta = {
   id: 'rules', name: 'RULE BREAKER', color: '#ffe14a', music: 'coins', tier: 3,
   tagline: 'The rules are blocks. Push them.',
+  card: { rule: 'MOST GEMS WINS', rule2: 'PUSH WORDS TO CHANGE THE RULES', keys: [['X', 'SHOOT'], ['A', 'DASH'], ['RB', 'BLOCK']], danger: 'WHATEVER THE RULES SAY' },
   objective: 'Most gems wins. Push word blocks into the sentences to change the rules for everyone.',
   controls: [['STICK', 'Move (walk into words)'], ['X / RT', 'Shoot (shots push words too)'], ['A', 'Dash'], ['RB', 'Block']],
   hazards: 'Whatever the rules say / LEADER IS ... hits whoever has the most gems / from 30 s the sentences lock',

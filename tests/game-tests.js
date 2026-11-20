@@ -374,3 +374,64 @@ test('draw functions run without errors', () => {
     for (let k = 0; k < 900; k++) { game.update(1 / 60, input(1 / 60)); if (k % 60 === 0) { game.draw(g); fx.draw(g); } }
   }
 });
+
+// ---- core pass (build .9-core) ----
+for (const id of ['orbit', 'mobius']) {
+  test(`${id} is a best-of like Rooftop: 2+ rounds, most round wins ranks first, under the cap (B-03)`, () => {
+    for (let v = 0; v < 3; v++) {
+      const { game, secs } = playthrough(id, { variant: v });
+      ok(game.finished, 'finished');
+      ok(game.round >= 2, `only ${game.round} round(s) in v${v}`);
+      ok(secs <= 62, `took ${secs}s`);
+      eq(game.ranking[0], game.players.slice().sort((a, b) => b.wins - a.wins)[0].seat, 'most round wins ranks first');
+      ok(game.hudInfo(1).pipMax === 2, 'HUD shows round pips');
+    }
+  });
+  test(`${id}: a sudden-death ghost never respawns between rounds`, () => {
+    const { game } = playthrough(id, { ghosts: [3] });
+    const g3 = game.players.find((p) => p.seat === 3);
+    ok(g3.dead && g3.wins === 0, 'seat 3 stayed a ghost');
+  });
+}
+test('orbit: all three arenas run, including twin planets', () => {
+  const names = new Set();
+  for (let v = 0; v < 3; v++) { const { game } = playthrough('orbit', { variant: v }); ok(game.finished); names.add(game.layoutName); }
+  eq([...names].sort(), ['GAS GIANT', 'OUTPOST', 'TWIN PLANETS']);
+});
+test('wormhole: a player who never fights cannot win a tie on hits taken', () => {
+  const fx = new Fx();
+  const game = GAMES.wormhole.create({ fx, sound: NO_SOUND, variant: 0, players: [1, 2].map((s) => ({ seat: s, idx: s - 1, stats: statsFor({}), pickupMult: 1 })) });
+  const [a, b] = game.players;
+  a.held = 0.4; b.held = 0.2; a.taken = 0; b.taken = 3; b.landed = 2; a.landed = 0;
+  let n = 0; while (!game.finished && n < 60 * 70) { game.update(1 / 60, new Map([[1, NO_CONTROLS], [2, NO_CONTROLS]])); n++; }
+  // neither held the orb a whole second: the one who landed hits wins, not the one who hid
+  if (Math.floor(a.held) === Math.floor(b.held)) eq(game.ranking[0], 2);
+});
+test('impact: the freeze grows with damage and is capped', () => {
+  const fx = new Fx();
+  fx.impact(10, 10, { dmg: 10 }); const small = fx.hitstop;
+  const fx2 = new Fx(); fx2.impact(10, 10, { dmg: 60 }); const big = fx2.hitstop;
+  ok(big > small, 'bigger hit, longer freeze');
+  const fx3 = new Fx(); fx3.impact(10, 10, { dmg: 999 }); ok(fx3.hitstop <= 0.1 + 1e-9, 'capped at 100 ms');
+  const fx4 = new Fx(); fx4.calm = true; fx4.impact(10, 10, { dmg: 40 }); eq(fx4.trauma, 0, 'calm mode: no shake');
+});
+test('core set: real events, three per act, enough for an 8-event night with no repeats', () => {
+  const core = ['rumble', 'coins', 'tick', 'orbit', 'lightsout', 'mirror', 'mobius', 'wormhole', 'rules'];
+  const tiers = core.map((id) => GAMES[id].meta.tier || 1);
+  eq([1, 2, 3].map((t) => tiers.filter((x) => x === t).length), [3, 3, 3]);
+  for (const id of core) ok(GAMES[id].meta.card, `${id} has a short intro card`);
+  for (let k = 0; k < 100; k++) {
+    const p = makePlaylist(core, 2, Math.random, 8, (id) => GAMES[id].meta.tier || 1);
+    eq(new Set(p).size, 8, 'no repeats');
+  }
+});
+test('intro cards fit on screen at reading size', () => {
+  const g = new Gfx(document.createElement('canvas'));
+  for (const [id, m] of Object.entries(GAMES)) {
+    if (!m.meta.card) continue;
+    const c = m.meta.card;
+    ok(g.textW(c.rule, 2) <= 300, `${id} rule too wide`);
+    ok(g.textW(c.rule2, 2) <= 300, `${id} rule2 too wide`);
+    ok(g.textW('DANGER ' + c.danger, 2) <= 300, `${id} danger too wide`);
+  }
+});

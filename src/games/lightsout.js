@@ -11,6 +11,7 @@ import { S } from '../engine/gfx.js';
 export const meta = {
   id: 'lightsout', name: 'LIGHTS OUT', color: '#ffd84a', music: 'lounge', tier: 2,
   tagline: 'A heist in the dark',
+  card: { rule: 'GRAB THE MOST GEMS IN THE DARK', rule2: 'YOUR FLASHLIGHT POINTS WHERE YOU AIM', keys: [['X', 'SHOOT'], ['A', 'DASH'], ['RB', 'BLOCK']], danger: 'GUARD SEES YOU: DROP HALF' },
   objective: 'Grab the most gems in a pitch-dark warehouse. Your flashlight points where you aim. Shots light the room and knock gems loose.',
   controls: [['STICK', 'Move (flashlight follows)'], ['R-STICK', 'Point the flashlight and aim'], ['X / RT', 'Shoot (bullets glow)'], ['A', 'Dash'], ['RB', 'Block']],
   hazards: 'A guard robot with a red searchlight (get spotted and you drop half) / lightning that shows everything for a moment',

@@ -12,6 +12,7 @@ import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js'
 export const meta = {
   id: 'mirror', name: 'MIRROR TWINS', color: '#9fd3ff', music: 'coins', tier: 2,
   tagline: 'One stick, two bodies, one lying mirror',
+  card: { rule: 'MOST GEMS WINS', rule2: 'ONE STICK MOVES YOU AND YOUR TWIN', keys: [['X', 'BOTH SHOOT'], ['A', 'DASH'], ['RB', 'BLOCK']], danger: 'THE MIRROR RULE CHANGES' },
   objective: 'Most gems wins. One stick moves you AND your twin on the other side of the mirror.',
   controls: [['STICK', 'Move both (mirror rule)'], ['X / RT', 'Both shoot'], ['A', 'Both dash'], ['RB', 'Both block']],
   hazards: 'Mirror rule changes every 11 s / a laser sweeps each side / spike balls / hits drop gems',

@@ -5,7 +5,8 @@
 // you get flung. Goal: hold the orb. At 25 s the floor turns to lava, so the
 // only safe way around is through the holes.
 import { clamp, rand, overlap } from '../engine/util.js';
-import { drawPlayer, drawTag, SEAT_COLORS } from '../engine/sprites.js';
+import { drawPlayer, drawTag, drawGun, SEAT_COLORS } from '../engine/sprites.js';
+import { Drift, P } from '../engine/style.js';
 import { makeBody, platformControl, stepBody } from './platformer.js';
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
@@ -15,10 +16,11 @@ export const meta = {
   id: 'wormhole', name: 'WORMHOLE', color: '#ffb03a', music: 'rumble', tier: 3,
   tagline: 'Shoot holes in space. Keep your speed.',
   objective: 'Hold the orb the longest. Shots punch holes: go in one of yours, come out the other.',
+  card: { rule: 'HOLD THE ORB THE LONGEST', rule2: 'YOUR SHOTS MAKE 2 HOLES: IN ONE, OUT THE OTHER', keys: [['A', 'JUMP'], ['X', 'SHOOT A HOLE'], ['RB', 'BLOCK']], danger: 'SHOTS DROP THE ORB. LAVA FLOOR AT 25 S' },
   controls: [['STICK', 'Move and aim'], ['A', 'Jump (double jump)'], ['X / RT', 'Shoot a hole into a wall'], ['RB', 'Block']],
   hazards: 'Lava pit / at 25 s the floor turns to lava / getting shot drops the orb / anyone can use your holes',
   ghost: 'Out of sudden death: drift as a ghost; you cannot hold the orb',
-  tiebreak: 'Held the orb longer > took fewer hits',
+  tiebreak: 'Held the orb longer > landed more hits > took fewer hits',
   gunUse: 'Your gun (bullets punch holes and fly through them)', blockUse: 'Your block (RB)', bodyUse: 'Your body and jumps',
   twists: ['moon', 'heavy', 'wind', 'bullettime', 'giant', 'hyper', 'ice'],
 };
@@ -50,7 +52,7 @@ export function create(ctx) {
   const L = LAYOUTS[ctx.variant % LAYOUTS.length];
   const solids = L.solids.map((s) => ({ ...s }));
   let env = twistEnv(tw, 0);
-  let t = 0, endT = null, lava = false;
+  let t = 0, endT = null, lava = false, lavaSaid = false;
   const starts = [[40, 150], [280, 150], [160, 70]];
   const players = ctx.players.map((pl, i) => {
     const st = pl.stats;
@@ -58,11 +60,12 @@ export function create(ctx) {
     const p = {
       seat: pl.seat, idx: pl.idx, b: makeBody(starts[i][0] - w / 2, starts[i][1] - h, w, h), face: i === 1 ? -1 : 1, aim: 0,
       ghost: !!pl.ghost, held: 0, taken: 0, gs: newGunState(st.gun), blockT: 0, blockCd: 0, invT: 0, flashT: 0, slowT: 0,
-      mult: pl.pickupMult ?? 1, shields: st.shields, holes: [], nextHole: 0, tpCd: 0, flingT: 0,
+      mult: pl.pickupMult ?? 1, shields: st.shields, holes: [], nextHole: 0, tpCd: 0, flingT: 0, landed: 0, recoil: 0,
     };
     p.pos = () => [p.b.x + p.b.w / 2, p.b.y + p.b.h / 2];
     return makeBuffable(p, st);
   });
+  const drift = ctx.drift || new Drift();
   const orb = { x: 160, y: 40, vx: 0, vy: 0, r: 4, holder: null, dropCd: 0, last: null, tpCd: 0 };
   const game = { meta, finished: false, ranking: [], players, layoutName: L.name };
   const live = () => players.filter((p) => !p.ghost);
@@ -127,8 +130,11 @@ export function create(ctx) {
       if (p.blockT > 0) { if (p.st.reflect && info.kind === 'bullet') return 'reflect'; sound.sfx('block'); return 'blocked'; }
       if (p.shields > 0) { p.shields -= 1; p.invT = 0.5; const [cx, cy] = p.pos(); fx.popup('AIRBAG!', cx, cy - 12, '#9fd3ff', 1); sound.sfx('block'); return 'blocked'; }
       p.b.vx += info.dx * k * p.st.knockTaken; p.b.vy += info.dy * k * 0.7 * p.st.knockTaken - 90; p.b.stun = 0.25; p.flashT = 0.12; p.taken += 1;
-      if (orb.holder === p) dropOrb(p, info.dx * 120, -160);
-      sound.sfx('hit'); fx.shake(0.15);
+      if (info.owner && info.owner !== p && info.owner.landed !== undefined) info.owner.landed += 1;
+      const big = orb.holder === p;
+      if (big) dropOrb(p, info.dx * 120, -160);
+      const [hx, hy] = p.pos();
+      fx.impact(hx, hy, { dmg: big ? 40 : 15, col: SEAT_COLORS[p.idx], dx: info.dx, dy: info.dy }); sound.sfx(big ? 'hitBig' : 'hit');
       return 'hit';
     },
     onPaint: (b, x, y, end) => { if (end && b.owner && b.owner.holes) placeHole(b.owner, x, y, b.vx, b.vy); },
@@ -214,7 +220,9 @@ export function create(ctx) {
   game.update = (dt, controls) => {
     t += dt;
     env = { ...twistEnv(tw, t), ice: tw && tw.ice };
-    if (!lava && t >= LAVA_AT) { lava = true; fx.popup('THE FLOOR IS LAVA', 160, 60, '#ff5a1a', 2); fx.flash('#ff5a1a', 0.3); sound.sfx('warn'); fx.hueKick = (fx.hueKick || 0) + 25; }
+    if (!lava && t >= LAVA_AT) { lava = true; fx.popup('THE FLOOR IS LAVA', 160, 60, P.danger, 2); fx.flash('#ff5a1a', 0.25); sound.sfx('warn'); drift.kick('#ff5a1a', 0.8); }
+    if (!lavaSaid && t >= LAVA_AT - 3) { lavaSaid = true; fx.popup('LAVA IN 3', 160, 60, P.warn, 2); sound.sfx('warn'); }
+    for (const p of players) p.recoil *= Math.pow(0.0001, dt);
     for (const p of players) {
       const c = controls.get(p.seat);
       tickBuffs(p, dt);
@@ -231,7 +239,7 @@ export function create(ctx) {
       const a = c.aim ? Math.atan2(c.ay, c.ax) : Math.hypot(c.mx, c.my) > 0.4 ? Math.atan2(c.my, c.mx) : (p.face > 0 ? 0 : Math.PI);
       p.aim = a;
       const [cx, cy] = p.pos();
-      if (!p.ghost) guns.trigger(p, p.gs, p.st.gun, c.fire && p.b.stun <= 0, a, cx + Math.cos(a) * 5, cy - 1 + Math.sin(a) * 5, dt);
+      if (!p.ghost && guns.trigger(p, p.gs, p.st.gun, c.fire && p.b.stun <= 0, a, cx + Math.cos(a) * 9, cy - 1 + Math.sin(a) * 9, dt)) p.recoil = 1;
       stepBody(p.b, dt, solids);
       if (p.b.landed) fx.dust(p.b.x + p.b.w / 2, p.b.y + p.b.h, '#ffcf8a');
       teleportBody(p);
@@ -247,8 +255,11 @@ export function create(ctx) {
     if (endT !== null) { endT -= dt; if (endT <= 0 && !game.finished) { game.finished = true; game.ranking = rank(); } }
   };
   function rank() {
-    return [...live().sort((x, y) => (y.held - x.held) || (x.taken - y.taken)), ...players.filter((p) => p.ghost)].map((p) => p.seat);
+    // whole seconds held decide it; ties go to whoever fought for it (an idle player can't win a tie)
+    return [...live().sort((x, y) => (Math.floor(y.held) - Math.floor(x.held)) || (y.landed - x.landed) || (x.taken - y.taken)), ...players.filter((p) => p.ghost)].map((p) => p.seat);
   }
+  game.hudInfo = (seat) => { const p = players.find((x) => x.seat === seat); return p.ghost ? { text: 'GHOST', pips: 0, pipMax: 0 } : { text: `${Math.floor(p.held)}s` + (orb.holder === p ? ' ORB' : ''), pips: 0, pipMax: 0, warn: false }; };
+  game.leader = () => { const r = live().filter((p) => p.held >= 1).sort((x, y) => y.held - x.held); return r.length ? r[0].seat : null; };
   game.hud = (seat) => { const p = players.find((x) => x.seat === seat); return p.ghost ? 'GHOST' : `${Math.floor(p.held)}s` + (orb.holder === p ? ' ORB!' : ''); };
   game.botTarget = (seat) => {
     const p = players.find((x) => x.seat === seat);
@@ -277,26 +288,31 @@ export function create(ctx) {
   }
 
   game.draw = (g) => {
-    g.rect(0, 0, 320, 180, '#14110d', true);
-    for (let y = TOP; y < BOT; y += 12) for (let x = 0; x < 320; x += 12) g.rect(x, y, 11, 11, (x + y) % 24 ? '#1b1712' : '#1f1a14', true);
-    g.text(L.name, 160, 28, { scale: 1, col: '#ffb03a55', align: 'center', ui: false, shadow: null });
+    const D = (c, layer = 'bg') => drift.col(c, layer);
+    // L0: a test-chamber wall of quiet tiles
+    g.rect(0, 0, 320, 180, D('#14110d'), true);
+    const ta = D('#1b1712'), tb = D('#1f1a14');
+    for (let y = TOP; y < BOT; y += 12) for (let x = 0; x < 320; x += 12) g.rect(x, y, 11, 11, (x + y) % 24 ? ta : tb, true);
+    g.text(L.name, 160, 28, { scale: 2, col: D('#3a2c18'), align: 'center', ui: false, shadow: null });
     // lava pit (and lava floors after the turn)
     const [p0, p1] = L.pit;
-    for (let x = p0; x < p1; x += 2) g.rect(x, 172 + Math.sin(x * 0.3 + t * 5) * 1.5, 2, 10, Math.floor(x / 2 + t * 8) % 5 ? '#ff5a1a' : '#ffb03a');
+    for (let x = p0; x < p1; x += 2) g.rect(x, 172 + Math.sin(x * 0.3 + t * 3) * 1.5, 2, 10, (x / 2) % 5 ? P.danger : '#ffb03a');
     for (const s of solids) {
       const hot = lava && s.floor;
-      g.rect(s.x, s.y, s.w, s.h, hot ? '#5a1a0a' : '#d8d4cc');
-      g.rect(s.x, s.y, s.w, 1, hot ? (Math.floor(t * 8 + s.x) % 2 ? '#ff5a1a' : '#ffb03a') : '#ffffff');
+      g.rect(s.x, s.y, s.w, s.h, hot ? '#5a1a0a' : D('#d8d4cc', 'geo'));
+      g.rect(s.x, s.y, s.w, hot ? 2 : 1, hot ? P.danger : '#ffffff');
       if (!hot && s.h > 6) for (let y = s.y + 6; y < s.y + s.h; y += 8) g.rect(s.x + 1, y, s.w - 2, 1, '#b8b2a8');
     }
-    if (!lava && t > LAVA_AT - 3 && Math.floor(t * 6) % 2) for (const s of solids) if (s.floor) g.rect(s.x, s.y, s.w, 2, '#ff5a1a');
+    if (!lava && t > LAVA_AT - 3) for (const s of solids) if (s.floor) { g.alpha(0.4 + 0.4 * ((t - LAVA_AT + 3) / 3)); g.rect(s.x, s.y, s.w, 2, P.danger); g.alpha(1); } // steady warning that fills in, no strobe
     for (const h of allHoles()) drawHole(g, h);
     pickups.draw(g);
     guns.draw(g);
     for (const p of players) {
       const b = p.b, cx = b.x + b.w / 2;
-      const blink = p.invT > 0 && Math.floor(t * 16) % 2;
-      drawPlayer(g, p.idx, cx, b.y + b.h, { flip: p.face < 0, size: p.st.size, squash: b.squash, flash: p.flashT > 0, alpha: p.ghost ? 0.3 : blink ? 0.5 : 1, look: p.aim });
+      const blink = p.invT > 0 && Math.floor(t * 8) % 2;
+      drawPlayer(g, p.idx, cx, b.y + b.h, { flip: p.face < 0, size: p.st.size, squash: b.squash, flash: p.flashT > 0, alpha: p.ghost ? 0.3 : blink ? 0.6 : 1, look: p.aim });
+      if (!p.ghost) drawGun(g, p.idx, cx, b.y + b.h / 2, p.aim, { size: p.st.size, recoil: p.recoil });
+      if (orb.holder === p) { g.alpha(0.6); g.ring(cx, b.y + b.h / 2, 11 * p.st.size, '#ffb03a'); g.alpha(1); }
       if (p.blockT > 0) g.ring(cx, b.y + b.h / 2, 10 * p.st.size, '#5affd9');
       drawBuffs(g, p, cx, b.y - 6);
       if (!p.ghost) drawTag(g, p.idx, cx, b.y - 5 - (orb.holder === p ? 10 : 0));

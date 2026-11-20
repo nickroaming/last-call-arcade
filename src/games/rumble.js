@@ -2,7 +2,7 @@
 // An event is a short best-of: last one standing takes a round, first to 2
 // round wins takes the event (audit F-01). Hazards run on the round clock.
 import { TAU, clamp, rand, overlap, circleRect } from '../engine/util.js';
-import { drawPlayer, drawTag, SEAT_COLORS } from '../engine/sprites.js';
+import { drawPlayer, drawTag, drawGun, SEAT_COLORS } from '../engine/sprites.js';
 import { makeBody, platformControl, stepBody, moveMovers, GRAV } from './platformer.js';
 import { Guns, newGunState, hitEffects, tickStatus } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
@@ -94,7 +94,7 @@ export function create(ctx) {
     const p = {
       seat: pl.seat, idx: pl.idx, b: makeBody(x0 - w / 2, sy - h - 2, w, h), hp: st.hp, maxHp: st.hp,
       dead: !!pl.ghost, deathT: pl.ghost ? -1 : null, face: x0 < 160 ? 1 : -1, gs: newGunState(st.gun), mult: pl.pickupMult ?? 1, tipsy: pl.tipsy || 0,
-      perma: !!pl.ghost, wins: 0, survive: 0, spawn: i, dealt: 0,
+      perma: !!pl.ghost, wins: 0, survive: 0, spawn: i, dealt: 0, recoil: 0,
       blockT: 0, blockCd: 0, shields: st.shields, hurtT: 0, flashT: 0, slowT: 0, poison: null,
       ghost: { x: 160, y: 50, cd: pl.ghost ? 1 : 0 },
     };
@@ -132,8 +132,7 @@ export function create(ctx) {
     p.hp -= dmg; p.hurtT = inv; p.flashT = 0.12;
     if (src && src !== p && src.dealt !== undefined) src.dealt += dmg;
     p.b.vx += kx * p.st.knockTaken; p.b.vy += ky * p.st.knockTaken; p.b.stun = 0.22;
-    fx.shake(0.12 + Math.min(0.3, dmg / 200)); fx.stop(0.03); sound.sfx('hit');
-    fx.burst(p.b.x + p.b.w / 2, p.b.y + p.b.h / 2, 8, SEAT_COLORS[p.idx], { speed: 90, life: 0.4 });
+    fx.impact(p.b.x + p.b.w / 2, p.b.y + p.b.h / 2, { dmg, col: SEAT_COLORS[p.idx], dx: kx, dy: ky }); sound.sfx(dmg >= 30 ? 'hitBig' : 'hit');
     fx.popup(String(Math.round(dmg)), p.b.x + p.b.w / 2, p.b.y - 6, '#fff', 1);
     if (g && src) hitEffects(p, src, dmg, g);
     if (p.hp <= 0) kill(p);
@@ -142,11 +141,7 @@ export function create(ctx) {
   function kill(p) {
     p.dead = true; p.deathT = t; p.hp = 0;
     const [cx, cy] = p.pos();
-    fx.burst(cx, cy, 34, SEAT_COLORS[p.idx], { speed: 160, life: 0.8, size: 2 });
-    fx.burst(cx, cy, 14, '#fff', { speed: 120, life: 0.5 });
-    fx.ring(cx, cy, 30, '#fff', 0.5);
-    fx.slow(0.45); fx.shake(0.7); fx.flash('#fff', 0.35); sound.sfx('ko'); drift.hush(0.7);
-    fx.hueKick = (fx.hueKick || 0) + 30;
+    fx.ko(cx, cy, SEAT_COLORS[p.idx]); sound.sfx('ko'); drift.hush(0.7);
     fx.popup(`P${p.idx + 1} OUT!`, cx, cy - 16, SEAT_COLORS[p.idx], 3);
     p.ghost.x = clamp(cx, 10, 310); p.ghost.y = 50; p.ghost.cd = 1;
   }
@@ -285,6 +280,7 @@ export function create(ctx) {
     t += dt;
     env = { ...twistEnv(tw, t), ice: tw && tw.ice };
     for (const m of motes) { m.x -= m.s * dt; if (m.x < -2) m.x = 322; }
+    for (const p of players) p.recoil *= Math.pow(0.0001, dt);
     if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
     if (endT !== null) { endT -= dt; if (endT <= 0 && !game.finished) { game.finished = true; game.ranking = rank(); } return; }
     if (between > 0) {
@@ -318,8 +314,8 @@ export function create(ctx) {
       else a = p.face > 0 ? 0 : Math.PI;
       p.aim = a;
       const [cx, cy] = p.pos();
-      if (guns.trigger(p, p.gs, p.st.gun, c.fire, a, cx + Math.cos(a) * 5, cy - 1 + Math.sin(a) * 5, dt)) {
-        p.b.vx -= Math.cos(a) * 30 * Math.sqrt(p.st.gun.knock); p.b.squash = 0.2;
+      if (guns.trigger(p, p.gs, p.st.gun, c.fire, a, cx + Math.cos(a) * 9, cy - 1 + Math.sin(a) * 9, dt)) {
+        p.b.vx -= Math.cos(a) * 30 * Math.sqrt(p.st.gun.knock); p.b.squash = 0.2; p.recoil = 1;
       }
       stepBody(p.b, dt, all);
       if (p.b.landed) fx.dust(p.b.x + p.b.w / 2, p.b.y + p.b.h, '#8fa0c8');
@@ -356,6 +352,8 @@ export function create(ctx) {
     return { text: p.dead ? 'OUT' : `${Math.max(0, Math.ceil((p.hp / p.maxHp) * 100))}%`, pips: p.wins, pipMax: WIN_ROUNDS, warn: !p.dead && p.hp / p.maxHp < 0.35 };
   };
   Object.defineProperty(game, 'round', { get: () => round });
+  game.leader = () => (contenders().some((p) => p.wins) ? rank()[0] : null);
+  game.matchPoint = () => contenders().some((p) => p.wins === WIN_ROUNDS - 1);
   Object.defineProperty(game, 'timeLeft', { get: () => Math.max(0, Math.min(TIME - t, ROUND_CAP - roundT)) });
 
   game.draw = (g) => {
@@ -371,7 +369,7 @@ export function create(ctx) {
       b.lit.forEach((on, k) => { if (on) g.rect(b.x + 4 + (k % 2) * 10, 180 - b.h + 6 + Math.floor(k / 2) * 9, 3, 4, D('#5a4a3a'), true); });
     }
     if (bold) for (const m of motes) { g.alpha(0.35); g.rect(m.x, m.y, 1, 1, D('#c9b8ff'), true); g.alpha(1); }
-    g.text(L.name, 160, 22, { scale: 2, col: D('#3a2d66'), align: 'center', ui: true, shadow: null });
+    if (roundT < 2.5) { g.alpha(Math.min(1, (2.5 - roundT) * 2)); g.text(L.name, 160, 26, { scale: 2, col: '#7a6ab8', align: 'center', ui: true, shadow: null }); g.alpha(1); } // arena title, then out of the way
     // L1 arena geometry: stable bright top edges, fill drifts only a little
     for (const s of saws) g.dotted(s.ax, s.ay, s.bx, s.by, '#5a5478', 3);
     for (const s of solids) {
@@ -418,6 +416,7 @@ export function create(ctx) {
       const shielded = p.hurtT > 0 && roundT < SPAWN_SHIELD + 0.05;
       const blink = !shielded && p.hurtT > 0 && p.hurtT < 0.5 && Math.floor(t * 8) % 2;
       drawPlayer(g, p.idx, cx, p.b.y + p.b.h, { flip: p.face < 0, size: p.st.size, flash: p.flashT > 0, alpha: blink ? 0.6 : 1, squash: p.b.squash, look: p.aim });
+      drawGun(g, p.idx, cx, p.b.y + p.b.h / 2 - 1, p.aim ?? (p.face > 0 ? 0 : Math.PI), { size: p.st.size, recoil: p.recoil });
       if (shielded) { g.alpha(0.5); g.ring(cx, p.b.y + p.b.h / 2, 11 * p.st.size, SEAT_COLORS[p.idx]); g.alpha(1); }
       if (p.blockT > 0) { g.ring(cx, p.b.y + p.b.h / 2, 10 * p.st.size, '#9ff'); g.ring(cx, p.b.y + p.b.h / 2, 9 * p.st.size, P.safe); }
       else if (p.blockCd <= 0) g.rect(cx - 1, p.b.y + p.b.h + 2, 2, 1, P.safe);
@@ -438,7 +437,7 @@ export function create(ctx) {
       if (!p.dead || p.perma || game.finished || between > 0) continue;
       const gh = p.ghost;
       drawPlayer(g, p.idx, gh.x, gh.y + Math.sin(t * 4 + p.idx) * 2, { alpha: 0.55, size: 0.9 });
-      g.text(`P${p.idx + 1}`, gh.x, gh.y - 18, { scale: 1, col: SEAT_COLORS[p.idx], align: 'center', ui: false });
+      g.text(`P${p.idx + 1}`, gh.x, gh.y - 18, { scale: g.large ? 2 : 1, col: SEAT_COLORS[p.idx], align: 'center', ui: false });
       g.dotted(gh.x, gh.y + 4, gh.x, groundBelow(gh.x) - 2, gh.cd <= 0 ? P.danger : '#555', 5);
       if (gh.cd <= 0) g.text('X: ANVIL', gh.x, gh.y + 5, { scale: 1, col: P.warn, align: 'center', ui: false });
     }
