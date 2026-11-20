@@ -1,4 +1,19 @@
-# Online seat test (can your brother play from his house?)
+# Online test (play from different places)
+
+## How to play (the simple version)
+1. **Xbox:** open Edge, go to **nickroaming.github.io/last-call-arcade/online-test.html**, press **A**.
+2. **The TV shows a QR code and a 4-letter code.** Leave that screen up.
+3. **Phones:** scan the QR code with the camera. Or open **nickroaming.github.io/last-call-arcade/join** and type the code.
+4. **On the phone:** drag the stick, press **A**. Your numbered dot moves on the TV and in the video on your phone.
+5. **PASS** in green on both screens means it works. Up to 8 players.
+
+The phone needs no controller: it shows an on-screen stick plus A and B. A laptop can use a plugged-in controller or the keyboard (WASD + Space).
+
+**Why the Xbox felt stuck (20 Nov):** the test page did not tell Xbox Edge to hand the controller to the page, so the controller only moved a mouse cursor and A did nothing. Fixed: A now hosts.
+
+---
+
+# Detailed test notes
 
 **Goal:** find out whether your Xbox can stream the game to your brother and receive his controller, before we build it into the real game.
 It takes about 10 minutes. You both need to be available at the same time (a phone call helps).

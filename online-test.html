@@ -2,101 +2,164 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Last Call Arcade · Online Seat Test</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Last Call Arcade · Play Online</title>
+<script>
+// Xbox Edge: give the controller to the page instead of using it as a mouse cursor.
+try { if ('gamepadInputEmulation' in navigator) navigator.gamepadInputEmulation = 'gamepad'; } catch (e) {}
+</script>
 <style>
-  :root { --bg: #12101c; --panel: #1f1b2e; --ink: #f4f1ff; --dim: #a59fc4; --good: #7dff8a; --bad: #ff5a5a; --warn: #ffd84a; --acc: #33d6ff; }
-  * { box-sizing: border-box; }
+  :root { --bg: #12101c; --panel: #1f1b2e; --ink: #f4f1ff; --dim: #a59fc4; --good: #7dff8a; --bad: #ff5a5a; --warn: #ffd84a; --acc: #33d6ff; --pink: #ff5fd2; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font-family: "Segoe UI", system-ui, sans-serif; }
   body { padding: 3vh 4vw; font-size: clamp(15px, 2.2vmin, 26px); }
-  h1 { margin: 0 0 .4em; font-size: 1.6em; }
-  h1 span { color: var(--dim); font-weight: 500; font-size: .7em; }
-  .row { display: flex; gap: 1em; flex-wrap: wrap; align-items: stretch; }
-  .panel { background: var(--panel); border-radius: .6em; padding: .8em 1em; flex: 1 1 18em; }
+  h1 { margin: 0 0 .2em; font-size: 1.8em; letter-spacing: .04em; }
+  .lead { color: var(--dim); margin: 0 0 1em; }
+  .panel { background: var(--panel); border-radius: .6em; padding: .8em 1em; }
   button { font: inherit; font-weight: 800; padding: .7em 1.2em; border-radius: .5em; border: .15em solid var(--acc); background: #0b0a12; color: var(--ink); cursor: pointer; }
-  button:focus { outline: .2em solid var(--warn); }
-  input { font: inherit; font-size: 1.6em; width: 6em; text-transform: uppercase; letter-spacing: .2em; padding: .2em .4em; border-radius: .3em; border: .15em solid var(--acc); background: #0b0a12; color: var(--ink); }
-  .code { font-size: 4em; font-weight: 900; letter-spacing: .25em; color: var(--warn); }
-  .checks { list-style: none; padding: 0; margin: .4em 0; }
-  .checks li { padding: .15em 0; }
-  .pass::before { content: '✔ PASS  '; color: var(--good); font-weight: 900; }
-  .fail::before { content: '✘ FAIL  '; color: var(--bad); font-weight: 900; }
-  .wait::before { content: '…  '; color: var(--dim); font-weight: 900; }
+  button:focus { outline: .25em solid var(--warn); }
+  input { font: inherit; font-size: 1.6em; width: 5em; text-transform: uppercase; letter-spacing: .2em; padding: .2em .4em; border-radius: .3em; border: .15em solid var(--acc); background: #0b0a12; color: var(--ink); }
   .small { color: var(--dim); font-size: .8em; }
-  canvas, video { width: 100%; max-width: 960px; aspect-ratio: 16/9; background: #000; border-radius: .4em; display: block; }
+  .hidden { display: none !important; }
+
+  /* choose */
+  .choices { display: flex; gap: 1em; flex-wrap: wrap; }
+  .choice { flex: 1 1 16em; display: flex; flex-direction: column; gap: .5em; align-items: flex-start; }
+  .choice .title { font-size: 2em; font-weight: 900; }
+  #hostBtn { font-size: 1.6em; padding: .6em 1.4em; border-color: var(--warn); }
+  .touch-first .choices { flex-direction: column-reverse; }
+  details { margin-top: 1em; }
+  summary { cursor: pointer; color: var(--dim); font-weight: 700; }
+
+  /* checks */
+  .checks { list-style: none; padding: 0; margin: .4em 0; }
+  .checks li { padding: .12em 0; }
+  .checks .pass::before { content: '✔ '; color: var(--good); font-weight: 900; }
+  .checks .fail::before { content: '✘ '; color: var(--bad); font-weight: 900; }
+  .checks .wait::before { content: '…  '; color: var(--dim); font-weight: 900; }
+  .verdict { font-size: 1.6em; font-weight: 900; }
+  .verdict.ok { color: var(--good); } .verdict.no { color: var(--bad); } .verdict.wait { color: var(--warn); }
+
+  /* host (TV) */
+  .hostgrid { display: grid; grid-template-columns: minmax(14em, 1fr) 2.2fr; gap: 1em; align-items: start; }
+  .joininfo { text-align: center; }
+  #qr { background: #fff; border-radius: .4em; padding: .4em; display: inline-block; margin: .3em 0; line-height: 0; }
+  #qr svg, #qr img { width: 11em; height: 11em; }
+  .url { font-weight: 800; color: var(--acc); word-break: break-all; }
+  .code { font-size: 3.4em; font-weight: 900; letter-spacing: .2em; color: var(--warn); line-height: 1.1; }
+  canvas, video { width: 100%; aspect-ratio: 16/9; background: #000; border-radius: .4em; display: block; }
+  .players { list-style: none; padding: 0; margin: .4em 0 0; }
+  .players li { padding: .1em 0; }
+  .dot { display: inline-block; width: .9em; height: .9em; border-radius: 50%; vertical-align: -.1em; margin-right: .3em; }
+  .hostfoot { display: flex; gap: 1.5em; flex-wrap: wrap; margin-top: .6em; }
+  @media (max-width: 700px) { .hostgrid { grid-template-columns: 1fr; } }
+
+  /* join (phone) */
+  #join { max-width: 960px; margin: 0 auto; }
+  .status { display: flex; gap: .8em; align-items: baseline; flex-wrap: wrap; margin: .5em 0; }
+  .touch { display: flex; justify-content: space-between; align-items: center; gap: 1em; margin-top: .6em; touch-action: none; user-select: none; -webkit-user-select: none; }
+  #stickZone { width: 44vmin; height: 44vmin; max-width: 240px; max-height: 240px; border-radius: 50%; background: #0b0a12; border: .2em solid #4a4466; position: relative; touch-action: none; }
+  #stickKnob { position: absolute; width: 40%; height: 40%; left: 30%; top: 30%; border-radius: 50%; background: var(--acc); pointer-events: none; }
+  .tbtns { display: flex; gap: .8em; align-items: center; }
+  .tbtn { width: 22vmin; height: 22vmin; max-width: 120px; max-height: 120px; border-radius: 50%; font-size: 2em; padding: 0; touch-action: none; }
+  #tA { border-color: var(--good); color: var(--good); }
+  #tB { border-color: var(--bad); color: var(--bad); }
+  .tbtn.on { background: var(--ink); color: #000; }
   .pad { display: flex; gap: .3em; flex-wrap: wrap; margin-top: .4em; }
   .b { min-width: 2.4em; text-align: center; padding: .15em .3em; border: .12em solid #4a4466; border-radius: .3em; font-weight: 800; color: var(--dim); }
   .b.on { background: var(--ink); color: #000; border-color: var(--ink); }
   .stick { width: 4em; height: 4em; border: .15em solid #4a4466; border-radius: 50%; position: relative; display: inline-block; }
   .stick i { position: absolute; width: 1.2em; height: 1.2em; border-radius: 50%; background: var(--acc); left: 50%; top: 50%; margin: -.6em 0 0 -.6em; }
-  .big { font-size: 1.4em; font-weight: 800; }
-  .hidden { display: none !important; }
-  .verdict { font-size: 2.4em; font-weight: 900; }
-  .verdict.ok { color: var(--good); } .verdict.no { color: var(--bad); } .verdict.wait { color: var(--warn); }
+  pre { white-space: pre-wrap; margin: .3em 0 0; }
 </style>
 </head>
 <body>
-<h1>LAST CALL ARCADE <span>online seat test</span></h1>
 
-<section id="choose" class="row">
-  <div class="panel">
-    <div class="big">On the Xbox (the TV everyone is watching)</div>
-    <p>Press <b>A</b> on a controller, or click:</p>
-    <button id="hostBtn">HOST A ROOM</button>
+<section id="choose">
+  <h1>LAST CALL ARCADE</h1>
+  <p class="lead">Online test: the TV hosts, everyone else joins from a phone or laptop.</p>
+  <div class="choices">
+    <div class="panel choice">
+      <div class="title">On the TV</div>
+      <button id="hostBtn" autofocus>HOST</button>
+      <div class="small">On the Xbox just press <b>A</b> on your controller.</div>
+    </div>
+    <div class="panel choice">
+      <div class="title">On your phone</div>
+      <div class="small">Scan the QR code on the TV with your camera, or type the code:</div>
+      <div><input id="codeIn" maxlength="4" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="CODE"> <button id="joinBtn">JOIN</button></div>
+    </div>
   </div>
-  <div class="panel">
-    <div class="big">Your brother (laptop, PC, phone or PS4)</div>
-    <p>Type the 4-letter room code from the TV:</p>
-    <input id="codeIn" maxlength="4" autocomplete="off" spellcheck="false"> <button id="joinBtn">JOIN</button>
-    <p class="small">Plug in or pair the PS4 controller first, then press any button on it.</p>
-  </div>
-  <div class="panel">
-    <div class="big">This browser can…</div>
-    <ul class="checks" id="caps"></ul>
-  </div>
-  <div class="panel">
-    <div class="big">Network check</div>
-    <p class="small">Tests the connection service, a full connection on this device, and whether your internet allows direct connections.</p>
-    <button id="checkBtn">RUN NETWORK CHECK</button>
-    <ul class="checks" id="netChecks"></ul>
-  </div>
+  <details>
+    <summary>Having trouble? Run a check</summary>
+    <div class="panel" style="margin-top:.5em">
+      <button id="checkBtn">RUN NETWORK CHECK</button>
+      <ul class="checks" id="netChecks"></ul>
+      <div class="small" style="margin-top:.6em">This browser can…</div>
+      <ul class="checks" id="caps"></ul>
+    </div>
+  </details>
 </section>
 
 <section id="host" class="hidden">
-  <div class="row">
-    <div class="panel"><div class="small">ROOM CODE</div><div class="code" id="codeOut">····</div><div id="hostStatus" class="small">Starting…</div><div class="small" style="margin-top:.5em;color:var(--warn)">Keep this page open with the screen on.</div></div>
-    <div class="panel"><div class="small">RESULT</div><div class="verdict wait" id="hostVerdict">WAITING</div><ul class="checks" id="hostChecks"></ul></div>
-  </div>
-  <div class="row" style="margin-top:1em">
-    <div class="panel" style="flex: 2 1 30em"><div class="small">THIS PICTURE IS STREAMED TO THE REMOTE PLAYER</div><canvas id="stage" width="640" height="360"></canvas></div>
-    <div class="panel"><div class="small">REMOTE PLAYER'S CONTROLLER (LIVE)</div><div id="remotePad"><div class="small">Nobody connected yet</div></div><div id="hostStats" class="small"></div></div>
+  <div class="hostgrid">
+    <div class="panel joininfo">
+      <div><b>JOIN ON YOUR PHONE</b></div>
+      <div id="qr"></div>
+      <div class="small">Scan with your camera, or open</div>
+      <div class="url" id="shortUrl"></div>
+      <div class="small">and type</div>
+      <div class="code" id="codeOut">····</div>
+      <div id="hostStatus" class="small">Opening the room…</div>
+    </div>
+    <div class="panel">
+      <canvas id="stage" width="640" height="360"></canvas>
+      <div class="hostfoot">
+        <div><span class="verdict wait" id="hostVerdict">WAITING FOR PLAYERS</span><ul class="checks" id="hostChecks"></ul></div>
+        <div><div class="small">PLAYERS</div><ul class="players" id="players"><li class="small">Nobody yet</li></ul></div>
+      </div>
+      <div class="small">Keep this screen open. Each player's dot moves with their stick and grows when they press A.</div>
+    </div>
   </div>
 </section>
 
 <section id="join" class="hidden">
-  <div class="row">
-    <div class="panel" style="flex: 2 1 30em"><div class="small">LIVE FROM THE XBOX</div><video id="remoteVideo" autoplay playsinline muted></video><button id="unmute" class="hidden" style="margin-top:.5em">TAP TO START VIDEO</button></div>
-    <div class="panel"><div class="small">RESULT</div><div class="verdict wait" id="joinVerdict">CONNECTING</div><ul class="checks" id="joinChecks"></ul><div id="joinStats" class="small"></div><div class="small" style="margin-top:.6em">YOUR CONTROLLER</div><div id="localPad"></div></div>
+  <video id="remoteVideo" autoplay playsinline muted></video>
+  <button id="unmute" class="hidden" style="margin-top:.5em">TAP TO START VIDEO</button>
+  <div class="status"><span class="verdict wait" id="joinVerdict">CONNECTING…</span><span id="joinStats" class="small"></span></div>
+  <div id="touch" class="touch hidden">
+    <div id="stickZone"><i id="stickKnob"></i></div>
+    <div class="tbtns"><button class="tbtn" id="tB">B</button><button class="tbtn" id="tA">A</button></div>
   </div>
+  <details>
+    <summary>Details</summary>
+    <ul class="checks" id="joinChecks"></ul>
+    <div id="localPad"></div>
+  </details>
 </section>
 
-<div class="panel" id="logBox" style="margin-top:1em"><div class="small">WHAT HAPPENED (screenshot this if it fails)</div><pre id="log" class="small" style="white-space:pre-wrap;margin:.3em 0 0">Nothing yet.</pre></div>
-<p class="small" id="foot"></p>
+<details id="logBox">
+  <summary>What happened (log)</summary>
+  <pre id="log" class="small">Nothing yet.</pre>
+  <p class="small" id="foot"></p>
+</details>
+
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script>
 // Old-style script on purpose: it must run even on old browsers (like the PS4's).
 (function () {
   var caps = document.getElementById('caps');
   function row(ok, text) { var li = document.createElement('li'); li.className = ok ? 'pass' : 'fail'; li.appendChild(document.createTextNode(text)); caps.appendChild(li); }
-  row(!!navigator.getGamepads, 'Read a game controller (Gamepad API)');
+  row(!!navigator.getGamepads, 'Read a game controller');
   row(typeof RTCPeerConnection !== 'undefined', 'Make a direct connection (WebRTC)');
   var cv = document.createElement('canvas');
-  row(typeof cv.captureStream === 'function', 'Send video (needed only on the Xbox / host)');
-  row(typeof Promise !== 'undefined' && typeof fetch !== 'undefined', 'Run the online test (modern JavaScript)');
+  row(typeof cv.captureStream === 'function', 'Send video (needed only on the TV)');
+  row(typeof Promise !== 'undefined' && typeof fetch !== 'undefined', 'Run modern JavaScript');
   document.getElementById('foot').appendChild(document.createTextNode('Browser: ' + navigator.userAgent));
-  window.__capsDone = true;
+  if ('ontouchstart' in window || navigator.maxTouchPoints > 0) document.body.className += ' touch-first';
 })();
 </script>
-<script src="src/online/online-test.js?v=2"></script>
+<script src="src/online/online-test.js?v=3"></script>
 </body>
 </html>

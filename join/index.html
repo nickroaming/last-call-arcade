@@ -1,0 +1,9 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join · Last Call Arcade</title>
+<script>
+  var c = new URLSearchParams(location.search).get('c');
+  location.replace('../online-test.html' + (c ? '?join=' + encodeURIComponent(c) : '?typecode'));
+</script>
+<a href="../online-test.html?typecode">Tap here to join</a>
