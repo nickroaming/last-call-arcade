@@ -22,7 +22,7 @@ import * as updraft from '../games/updraft.js';
 import * as lightsout from '../games/lightsout.js';
 import { Bot } from './bots.js';
 
-export const BUILD = 'm1-2026-11-19.4';
+export const BUILD = 'm1-2026-11-20.5';
 export const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout };
 const GAME_IDS = Object.keys(GAMES);
 const params = new URLSearchParams(location.search);
@@ -399,7 +399,7 @@ function drawTitle() {
   const n = input.activeCount;
   if (n >= MIN_PLAYERS) {
     if (Math.floor(t * 3) % 2) g.text('PRESS X, MENU OR ENTER TO START', 160, 59, { scale: 2, col: '#7dff8a', align: 'center' });
-  } else g.text(MIN_PLAYERS > 1 ? 'NEED 2 OR 3 PLAYERS' : 'PRESS A TO JOIN', 160, 59, { scale: 2, col: '#ffffffaa', align: 'center' });
+  } else g.text(MIN_PLAYERS > 1 ? (n === 1 ? 'NEED 2: RT ADDS A CPU' : 'NEED 2 OR 3 PLAYERS') : 'PRESS A TO JOIN', 160, 59, { scale: 2, col: '#ffffffaa', align: 'center' });
   g.text(`Y SHAKE: ${SHAKE_LEVELS[settings.shake].name}  LB SOUND: ${settings.muted ? 'OFF' : 'ON'}  RB HOUSE RULES: ${settings.house ? 'ON' : 'OFF'}  LT COLOR: ${TRIP_LEVELS[settings.trip].name}`, 160, 165, { scale: 1, col: '#c8c0ff', align: 'center' });
   g.text('KEYS: WASD MOVE  SPACE=A  F=SHOOT  G=BLOCK  IJKL=AIM  ENTER=START  C=ADD CPU', 160, 172, { scale: 1, col: '#9a90c0', align: 'center' });
   g.text(BUILD, 318, 2, { scale: 1, col: '#5a5080', align: 'right' });
