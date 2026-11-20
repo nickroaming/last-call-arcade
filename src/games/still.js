@@ -4,7 +4,7 @@
 // frozen and your bullets hang in the air like mines. Gems are everywhere,
 // and collecting means moving. At 25 s time refuses to fully stop.
 import { TAU, clamp, rand, approach, segDist } from '../engine/util.js';
-import { drawPlayer, drawTag, SEAT_COLORS } from '../engine/sprites.js';
+import { drawPlayer, drawTag, drawArm, SEAT_COLORS } from '../engine/sprites.js';
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
@@ -13,6 +13,8 @@ import { baseStats } from '../game/powers.js';
 export const meta = {
   id: 'still', name: 'STILL LIFE', color: '#e8e4f8', music: 'lounge', tier: 2,
   tagline: 'Time only moves when you move',
+  card: { rule: 'TIME ONLY MOVES WHEN YOU MOVE', rule2: 'MOST GEMS WINS', keys: [['X', 'SHOOT'], ['A', 'DASH'], ['RB', 'BLOCK']], danger: 'TURRETS. THEY WAIT FOR YOU' },
+  broken: 'TIME', // the rule the Cabinet breaks in this event
   objective: 'Most gems wins. The room only moves when someone moves. Stand still and bullets freeze.',
   controls: [['STICK', 'Move (and move time)'], ['X / RT', 'Shoot (frozen shots hang)'], ['A', 'Dash'], ['RB', 'Block']],
   hazards: 'Turrets fire on the beat of time / a beam sweeps the room / hits drop gems / at 25 s time never fully stops',
@@ -67,7 +69,7 @@ export function create(ctx) {
     const lose = Math.min(p.gems, n); p.gems -= lose;
     for (let k = 0; k < lose; k++) { const a = rand(0, TAU); addGem(p.x, p.y, false, Math.cos(a) * 90, Math.sin(a) * 90); }
     if (lose) fx.popup(`-${lose}`, p.x, p.y - 14, '#ff5a5a', 1);
-    fx.shake(0.2); sound.sfx('hit'); fx.burst(p.x, p.y, 10, SEAT_COLORS[p.idx], { speed: 90, life: 0.4 });
+    fx.impact(p.x, p.y, { dmg: 20, col: SEAT_COLORS[p.idx] }); sound.sfx('hit');
     return 'hit';
   }
 
@@ -198,9 +200,10 @@ export function create(ctx) {
     pickups.draw(g);
     guns.draw(g);
     for (const p of players) {
-      const blink = p.invT > 0 && Math.floor(t * 16) % 2;
+      const blink = p.invT > 0 && Math.floor(t * 5) % 2;
       g.alpha(0.3); g.rect(p.x - 4, p.y + p.r - 1, 8, 2, '#000'); g.alpha(1);
       drawPlayer(g, p.idx, p.x, p.y + p.r, { flip: p.face < 0, size: p.st.size * 0.9, flash: p.flashT > 0, alpha: p.ghost ? 0.35 : blink ? 0.4 : 1, look: p.aim });
+      drawArm(g, p, p.x, p.y, p.st.size * 0.9);
       if (p.blockT > 0) g.ring(p.x, p.y, p.r + 4, '#5affd9');
       // how much of time this player is driving
       if (p.act > 0.05) { g.alpha(0.5); g.ring(p.x, p.y, p.r + 3 + p.act * 3, SEAT_COLORS[p.idx]); g.alpha(1); }

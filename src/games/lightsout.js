@@ -2,7 +2,7 @@
 // flashlight, gunfire and lightning reveal. A guard robot sweeps a red
 // searchlight; get caught in it and you drop your loot.
 import { TAU, clamp, rand, approach, circleRect, angleDiff } from '../engine/util.js';
-import { drawPlayer, drawTag, SEAT_COLORS } from '../engine/sprites.js';
+import { drawPlayer, drawTag, drawArm, SEAT_COLORS } from '../engine/sprites.js';
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
@@ -11,6 +11,7 @@ import { S } from '../engine/gfx.js';
 export const meta = {
   id: 'lightsout', name: 'LIGHTS OUT', color: '#ffd84a', music: 'lounge', tier: 2,
   tagline: 'A heist in the dark',
+  broken: 'LIGHT', // the rule the Cabinet breaks in this event
   card: { rule: 'GRAB THE MOST GEMS IN THE DARK', rule2: 'YOUR FLASHLIGHT POINTS WHERE YOU AIM', keys: [['X', 'SHOOT'], ['A', 'DASH'], ['RB', 'BLOCK']], danger: 'GUARD SEES YOU: DROP HALF' },
   objective: 'Grab the most gems in a pitch-dark warehouse. Your flashlight points where you aim. Shots light the room and knock gems loose.',
   controls: [['STICK', 'Move (flashlight follows)'], ['R-STICK', 'Point the flashlight and aim'], ['X / RT', 'Shoot (bullets glow)'], ['A', 'Dash'], ['RB', 'Block']],
@@ -81,7 +82,7 @@ export function create(ctx) {
       p.vx += info.dx * k; p.vy += info.dy * k; p.stun = 0.3; p.flashT = 0.12;
       if (info.g.frost) p.slowT = 1.5;
       dropGems(p, Math.max(1, Math.round(info.dmg / 34)), '');
-      sound.sfx('hit');
+      fx.impact(p.x, p.y, { dmg: info.dmg, col: SEAT_COLORS[p.idx], dx: info.dx, dy: info.dy }); sound.sfx('hit');
       return 'hit';
     },
   }, fx, sound);
@@ -205,7 +206,8 @@ export function create(ctx) {
     }
     guns.draw(g);
     for (const p of players) {
-      drawPlayer(g, p.idx, p.x, p.y + p.r, { flip: p.face < 0, size: p.st.size * 0.9, flash: p.flashT > 0 });
+      drawPlayer(g, p.idx, p.x, p.y + p.r, { flip: p.face < 0, size: p.st.size * 0.9, flash: p.flashT > 0, look: p.look });
+      drawArm(g, p, p.x, p.y, p.st.size * 0.9);
       if (p.blockT > 0) g.ring(p.x, p.y, p.r + 4, '#5affd9');
     }
     // darkness with holes cut by lights

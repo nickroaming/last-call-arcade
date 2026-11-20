@@ -1,7 +1,21 @@
 # Playtest and backlog
 
-**Latest build:** `m1-2026-11-20.9-core` (branch `quality/core-pass`, not published). **Previous:** `m1-2026-11-20.8-polish` (live on the Xbox link). The rooftop slice below is compared against `m1-2026-11-20.7`, kept playable in `before/`.
+**Latest build:** `m1-2026-11-20.10-night` (branch `quality/facelift`, not published). **Before that:** `m1-2026-11-20.9-core` (branch `quality/core-pass`), `m1-2026-11-20.8-polish` (live on the Xbox link). The rooftop slice below is compared against `m1-2026-11-20.7`, kept playable in `before/`.
 **Date:** 2026-11-20. **Environment for everything below:** Chromium browser pane on macOS, keyboard P1 + CPU P2/P3. **Nothing here was run on the Series X.**
+
+## The night (`m1-2026-11-20.10-night`), by finding
+| Finding | What changed | Files |
+| --- | --- | --- |
+| F-22 | The Cabinet narrates the night: on the title, at each act break (clock, act name, its line, "TONIGHT I BREAK: ..."), after each result, and in the 2:00 AM recap. Intro cards carry the night clock, the night strip, and "THE CABINET BREAKS: GRAVITY" for act 2 and 3 events. Every night opens with Rooftop and ends with Rule Breaker. | `src/game/night.js` (new), `main.js`, `match.js`, every event's `meta.broken` / `opener` / `finale` |
+| F-23 | One stage for every menu, changing per act, with scanlines and a CRT bezel; the bezel stays on in play. | `night.js`, `main.js` |
+| F-24 | Last place drafts from 4 cards. | `main.js` |
+| F-25 | Lounge: "DANCE!" tiles under anyone still for 2.2 s. Blast Ball: goal difference, score or play to place. Echo: land a hit to place above someone who did. | `lounge.js`, `blastball.js`, `echo.js` |
+| F-26 | Gun arms and the impact kit in every event; freeze cooldown. | `weapons.js`, `sprites.js`, `fx.js`, all events |
+| F-27 | No blink faster than 2.5 Hz in any event. | all events |
+| B-01 | Every event (16/16) has a short intro card. | all events |
+| — | New sounds: `act` (an act begins), `type` (the Cabinet types), `tick` (a recap line lands). Podium shows each player's card count. Rematch / new players prompts use glyphs. | `audio.js`, `main.js` |
+
+**Measured:** idle-player wins are 0–5% in every event except Dust Lap. A full night with three CPUs reached the recap and podium with no errors, in about 9 minutes including the act screens (I held two act screens and a results screen open for captures). **[A]** Without the held screens a night runs about 8 minutes, at the top of the 5–8 minute target. If it feels long on the couch, the act screens can be skipped with A after 1.4 s.
 
 ## Core pass (`m1-2026-11-20.9-core`), by finding
 | Finding | What changed | Files |
@@ -77,7 +91,8 @@
 ## Tests and results
 | Check | How | Result |
 | --- | --- | --- |
-| Unit and robot suite | `/tests/` (122 tests: every game, twist, card stack, 2-player, CPU bots, drawing) | **122/122 pass** (core pass) |
+| Unit and robot suite | `/tests/` (130 tests: every game, twist, card stack, 2-player, CPU bots, drawing) | **130/130 pass** (night build) |
+| Night tests | opener/finale order and acts in order (100 playlists); every act 2/3 event names a broken rule and act 1 events don't; all 16 events have a card; winners recorded per event; clock 11 PM → 2 AM; an idle seat never wins Lounge, Blast Ball or Echo (6 variants each); a hit every frame freezes < 35% of the time | pass |
 | Core-pass tests | Orbit and Mobius best-of (2+ rounds, most wins first, ≤ 62 s, round pips); their sudden-death ghosts never respawn; all three Orbit arenas run; Wormhole's idle player can't win a tie; impact freeze grows with damage and is capped, no shake in Calm Mode; core set has 3 per act, cards, no repeats; every intro card fits at reading size | pass |
 | Core night, normal entry | 3 CPUs, title → podium, default options | ✔ 6.8 min, acts in order, no errors |
 | Options | keyboard pad: Y opens, down + right changes TEXT SIZE to LARGE, B closes | ✔ setting saved and applied |
@@ -99,6 +114,14 @@
 - the 2-player version of the polished flow (it's covered by the robot test, but I didn't look at it)
 - sound (not audible here)
 - the House Rules prompt on the polished flow (code path unchanged)
+
+## Series X checklist: the night (do this first)
+1. Play one full night with all three of you. Don't explain anything beforehand.
+2. At the **act 2 screen** ("THE MACHINE WAKES"), does anyone react to "TONIGHT I BREAK: GRAVITY / LIGHT"? Did anyone connect it to the next game?
+3. At **2:00 AM**, when the recap lists the night, ask: did that feel planned? That's the moment this build is for. Write down what people say.
+4. Do the Cabinet's results lines land, or get in the way? Is the typing blip annoying?
+5. Is the night too long? Note the time from title to podium.
+6. Last place: did the 4th card get noticed?
 
 ## Series X checklist: core pass (add these to the list below)
 1. Title: press **Y**. Can everyone read OPTIONS from the couch? Move with the stick and the D-pad, change a value with left/right and A, leave with B.
@@ -132,23 +155,25 @@ Make a tick or a note each time it happens. Write the event name.
 ## Backlog (prioritised)
 | # | Priority | Item | Why | Finding |
 | --- | --- | --- | --- | --- |
-| B-01 | **Next** | Short `meta.card` for the 7 extra events | Done for all 9 core events. The extras still use the old small-text intro | F-02 |
+| B-01 | Done | Short intro card for every event | 16/16 | F-02 |
 | B-02 | **Next** | Route every event's backdrop through `drift.col` and its hazards through `P.danger` | Only Rooftop follows the layer rules. The rest have no drift at all now that the whole-screen filter is opt-in | F-07, F-10 |
 | B-03 | Done | Best-of rounds on Orbit and Mobius | 33 s / 38 s, idle ≤ 5%. Night 6.8 min | F-13, F-15 |
 | B-04 | High | Cap live bullets and particles (and merge explosion rings) under extreme stacks | 4 ms p95 and a 49 ms spike on a Mac. The Series X browser is the unknown. The screen gets busy | perf |
 | B-05 | Done (4 shooters) | Gun arms pointing at the aim | Rooftop, Orbit, Mobius, Wormhole. Coin Storm, Lights Out, Mirror Twins still use the old marker | F-18 |
 | B-06 | Medium | Raise platform fill contrast vs the skyline (1.22:1 today) | The edge does all the separation work | F-10 |
 | B-07 | Medium | Research a third couch reference for controller focus (not done this pass) | The brief asked for one | — |
-| B-08 | Medium | Comeback balance: give last place something extra (a 4th card or a reroll) | "Picks first" was a false promise. A real one would be better | F-06 |
+| B-08 | Done | Last place drafts from 4 cards | Shipped in the night build | F-06, F-24 |
 | B-09 | Low | Replace card icon letters (G/B/@) with drawn icons | Personality and scan speed | — |
 | B-10 | Low | Button remapping | TEXT SIZE and SCREEN FIT shipped in OPTIONS. Remap (XAG 107) still open | a11y |
-| B-11 | High | Laser Lounge: idle player wins 40% | Fails the bar. Needs a "land a hit" or score-only-by-acting rule | F-21 |
-| B-12 | High | Blast Ball: idle player wins 55%, finishes last only 15% | The scoring rewards staying away from the ball | F-21 |
-| B-13 | Medium | Echo Chamber: 12.6 s, idle wins 30% | Same fix family as Orbit and Mobius (rounds) | F-21 |
+| B-11 | Done (fairness) | Laser Lounge idle wins 40% → 5% via the DANCE floor. Still ~14 s with CPUs | F-25 |
+| B-12 | Done | Blast Ball idle wins 55% → 5% (goal difference) | F-25 |
+| B-13 | Partly | Echo idle wins 30% → 0%. Still ~13 s: rounds would lengthen it | F-25 |
 | B-14 | Medium | Updraft: ~7 s per event | Too short to matter. Rounds, or a longer climb | F-21 |
-| B-15 | Medium | Apply the feel kit (`fx.impact`, `drawGun`) and the layer palette to Coin Storm, Tick Tock, Lights Out, Mirror Twins, Rule Breaker | The core set should feel the same in every event | F-18, B-02 |
+| B-15 | Done | Feel kit and gun arms in every event; calm backdrop drift in Coin Storm, Tick Tock, Mirror Twins, Rule Breaker | F-26 |
+| B-16 | Medium | The Cabinet's results lines: more of them, and reacting to cards ("P3 HAS TWO SPLITTERS. OH NO.") | One voice is the thread; it should notice more | F-22 |
+| B-17 | Medium | Lights Out, Splat, Blast Ball, Echo, Still Life, Updraft, Dust Lap backdrops through the layer palette (B-02 for the rest) | Most visible remaining inconsistency | F-23 |
 
 ## The next three worth building
-1. **B-15 + B-02:** the feel kit and the layer palette on the five core events that don't have them yet, so every core event lands hits the same way.
-2. **B-08:** a real comeback for last place (a 4th card or a reroll in the draft). The draft is where ROUNDS gets its drama.
-3. **B-11 to B-14:** fix the four failing extras with the same measured method, then grow the core set past 9.
+1. **Play a night on the Series X** with the checklist above. The recap moment is a guess until three people see it.
+2. **B-16:** more Cabinet lines, reacting to cards and streaks. Cheap, and it is the thread.
+3. **B-13/B-14 + B-17:** rounds for Echo and Updraft, the palette on the remaining backdrops, then promote Lounge and Splat into the core set.

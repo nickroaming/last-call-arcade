@@ -8,11 +8,13 @@ import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js'
 export const meta = {
   id: 'lounge', name: 'LASER LOUNGE', color: '#ff5fd2', music: 'lounge', tier: 1,
   tagline: 'Dodge the light show',
-  objective: 'Survive the lasers. Last one dancing wins.',
+  objective: 'Survive the lasers. Last one dancing wins. Stand still and the floor heats up under you.',
+  card: { rule: 'LAST ONE DANCING WINS', rule2: 'STAND STILL AND THE FLOOR HEATS UP', keys: [['A', 'DASH']], danger: 'LASERS, ZAP TILES, DISCO BALLS' },
   controls: [['STICK', 'Move'], ['A', 'Dash'], ['X', 'Turret: fire (when out)'], ['R-STICK', 'Turret: aim']],
   hazards: 'Spinning lasers / laser walls with a gap / zapping floor tiles / bouncing disco balls',
   ghost: 'Out of hearts: ride the walls as a turret and shoot orbs at the survivors',
   tiebreak: 'Standing > more hearts > knocked out later',
+  // the dance floor punishes campers: an idle player used to win 33-40% of events
   gunUse: 'Your turret gun when you are out', blockUse: 'Your dash (A)', bodyUse: 'Your body (health = hearts)',
   twists: ['wind', 'giant', 'hyper', 'ice', 'rubber', 'warp'],
 };
@@ -112,8 +114,7 @@ export function create(ctx) {
       return;
     }
     p.hearts -= 1; p.inv = 1.3; p.flashT = 0.15;
-    fx.shake(0.3); fx.stop(0.04); sound.sfx('zap');
-    fx.burst(p.x, p.y - 5, 10, SEAT_COLORS[p.idx], { speed: 90, life: 0.4 });
+    fx.impact(p.x, p.y - 5, { dmg: 34, col: SEAT_COLORS[p.idx], dx: p.x - sx, dy: p.y - sy }); sound.sfx('zap');
     if (p.hearts <= 0) {
       p.out = true; p.outT = t;
       fx.burst(p.x, p.y - 5, 30, SEAT_COLORS[p.idx], { speed: 150, life: 0.8, size: 2 });
@@ -228,6 +229,18 @@ export function create(ctx) {
       p.x = clamp(p.x + p.vx * dt, 4, 316);
       p.y = clamp(p.y + p.vy * dt, TOP + 9, BOT - 1);
     }
+    // the floor heats up under anyone who stops dancing: 2.2 s within a few pixels arms the tiles around them
+    for (const p of alive()) {
+      if (!p.anchor || Math.hypot(p.x - p.anchor[0], p.y - p.anchor[1]) > 12) { p.anchor = [p.x, p.y]; p.stillT = 0; continue; }
+      p.stillT += dt;
+      if (p.stillT > 2.2 && t > 2) {
+        p.stillT = -1.2;
+        const c0 = Math.floor(p.x / TW), r0 = Math.floor((p.y - 3 - TY0) / TW), set = [];
+        for (let r = r0 - 1; r <= r0 + 1; r++) for (let c = c0 - 1; c <= c0 + 1; c++) if (r >= 0 && r < ROWS && c >= 0 && c < COLS) set.push([c, r]);
+        hazards.push({ type: 'tiles', set, warn: 1.1, life: 0.35 });
+        sound.sfx('warn'); fx.popup('DANCE!', p.x, p.y - 18, '#ffd84a', 2);
+      }
+    }
     // player pushing
     const al = alive();
     for (let i = 0; i < al.length; i++) for (let j = i + 1; j < al.length; j++) {
@@ -275,7 +288,7 @@ export function create(ctx) {
     for (const h of hazards) {
       if (h.type !== 'tiles') continue;
       for (const [c, r] of h.set) {
-        if (h.warn > 0) { if (Math.floor(t * 12) % 2) g.frame(c * TW + 1, TY0 + r * TW + 1, TW - 3, TW - 3, '#ff3a3a'); }
+        if (h.warn > 0) { if (Math.floor(t * 5) % 2) g.frame(c * TW + 1, TY0 + r * TW + 1, TW - 3, TW - 3, '#ff3a3a'); }
         else { g.rect(c * TW, TY0 + r * TW, TW - 1, TW - 1, '#ff6a6a'); g.rect(c * TW + 3, TY0 + r * TW + 3, TW - 7, TW - 7, '#fff'); }
       }
     }
@@ -284,7 +297,7 @@ export function create(ctx) {
     // players
     for (const p of players) {
       if (p.out) continue;
-      const blink = p.inv > 0 && Math.floor(t * 16) % 2;
+      const blink = p.inv > 0 && Math.floor(t * 5) % 2;
       g.alpha(0.3); g.rect(p.x - 4 * p.st.size, p.y - 1, 8 * p.st.size, 2, '#000'); g.alpha(1);
       drawPlayer(g, p.idx, p.x, p.y, { flip: p.face < 0, size: p.st.size * 0.85, flash: p.flashT > 0, alpha: blink ? 0.4 : 1 });
       if (p.shields) g.ring(p.x, p.y - 5, 8 * p.st.size, '#9fd3ff88');
@@ -299,7 +312,7 @@ export function create(ctx) {
         for (let k = 0; k < h.arms; k++) {
           const a = h.a + (k / h.arms) * TAU;
           const ex = h.cx + Math.cos(a) * 400, ey = h.cy + Math.sin(a) * 400;
-          if (h.warn > 0) { if (Math.floor(t * 12) % 2) g.dotted(h.cx, h.cy, h.cx + Math.cos(a) * 200, h.cy + Math.sin(a) * 200, '#ff3a3a', 4); }
+          if (h.warn > 0) { if (Math.floor(t * 5) % 2) g.dotted(h.cx, h.cy, h.cx + Math.cos(a) * 200, h.cy + Math.sin(a) * 200, '#ff3a3a', 4); }
           else { g.alpha(0.35); g.beam(h.cx, h.cy, ex, ey, 6, '#ff2a6a'); g.alpha(1); g.beam(h.cx, h.cy, ex, ey, 2, '#ffd0e0'); }
         }
         g.circle(h.cx, h.cy, 7, '#2a1040'); g.ring(h.cx, h.cy, 7, '#ff5fd2'); g.circle(h.cx, h.cy, 3, h.warn > 0 ? '#ff3a3a' : '#fff');
@@ -307,7 +320,7 @@ export function create(ctx) {
         const segs = h.horiz ? [[0, h.gap - h.gapW / 2], [h.gap + h.gapW / 2, 320]] : [[TOP, h.gap - h.gapW / 2], [h.gap + h.gapW / 2, BOT]];
         for (const [a0, a1] of segs) {
           if (h.warn > 0) {
-            if (Math.floor(t * 12) % 2) {
+            if (Math.floor(t * 5) % 2) {
               if (h.horiz) g.dotted(a0, h.pos + h.dirSign * 3, a1, h.pos + h.dirSign * 3, '#ff3a3a', 4);
               else g.dotted(h.pos + h.dirSign * 3, a0, h.pos + h.dirSign * 3, a1, '#ff3a3a', 4);
             }

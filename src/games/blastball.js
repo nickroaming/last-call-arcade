@@ -1,7 +1,7 @@
 // BLAST BALL: top-down pinball soccer. Each player guards a goal.
 // Shoot the ball (bullet knockback pushes it), dash into it, bank it off bumpers.
 import { TAU, clamp, rand, approach } from '../engine/util.js';
-import { drawPlayer, drawTag, SEAT_COLORS } from '../engine/sprites.js';
+import { drawPlayer, drawTag, drawArm, SEAT_COLORS } from '../engine/sprites.js';
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
@@ -9,11 +9,12 @@ import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js'
 export const meta = {
   id: 'blastball', name: 'BLAST BALL', color: '#7dff8a', music: 'dustlap', tier: 1,
   tagline: 'Pinball soccer with guns',
-  objective: 'Guard your goal. Shoot the ball into rivals\' goals. 3 goals against you and you\'re out.',
+  objective: 'Score in rivals\' goals, guard yours. Best goal difference wins. 3 against and you are out.',
+  card: { rule: 'BEST GOAL DIFFERENCE WINS', rule2: 'SCORE IN THEIRS. 3 IN YOURS AND YOU ARE OUT', keys: [['X', 'SHOOT'], ['A', 'DASH'], ['RB', 'BLOCK']], danger: 'BUMPERS, MULTIBALL AT 20 S' },
   controls: [['STICK', 'Move and aim'], ['X / RT', 'Shoot: bullets push the ball'], ['A', 'Dash: smash the ball'], ['RB', 'Block: bounce the ball back hard']],
   hazards: 'Bumpers that kick the ball / multiball at 20 s / rival bullets knock you back',
   ghost: 'Out: your goal becomes a wall you slide along as a turret',
-  tiebreak: 'Still in > fewer goals against > more goals scored',
+  tiebreak: 'Goals scored minus goals against > still in > knocked out later',
   gunUse: 'Your gun (knockback pushes the ball)', blockUse: 'Your block and dash', bodyUse: 'Your body',
   twists: ['wind', 'rubber', 'giant', 'warp', 'ice', 'hyper', 'bullettime'],
 };
@@ -100,7 +101,7 @@ export function create(ctx) {
       const k = 140 * (info.g.knock || 1) * p.st.knockTaken;
       p.vx += info.dx * k; p.vy += info.dy * k; p.stun = 0.25; p.flashT = 0.1;
       if (info.g.frost) p.slowT = 1.5;
-      sound.sfx('hit');
+      fx.impact(p.x, p.y, { dmg: 15, col: SEAT_COLORS[p.idx], dx: info.dx, dy: info.dy }); sound.sfx('hit');
       return 'hit';
     },
   }, fx, sound);
@@ -198,9 +199,12 @@ export function create(ctx) {
     if (endT !== null) { endT -= dt; if (endT <= 0 && !game.finished) { game.finished = true; game.ranking = rank(); } }
   };
   function rank() {
-    const a = inPlay().sort((x, y) => y.lives - x.lives || y.scored - x.scored);
-    const d = players.filter((p) => p.out).sort((x, y) => y.outT - x.outT || y.scored - x.scored);
-    return [...a, ...d].map((p) => p.seat);
+    // goal difference first: guarding alone can't win, you have to score (an idle player used to win 50-55%)
+    const net = (p) => p.scored - (LIVES - p.lives);
+    const order = (x, y) => (net(y) - net(x)) || ((x.out ? 1 : 0) - (y.out ? 1 : 0)) || ((y.outT ?? 1e9) - (x.outT ?? 1e9));
+    // you have to score to place above someone who did; if nobody scored, you have to have played (fired at least once)
+    const scoredAny = (p) => (p.scored > 0 ? 0 : p.recoilAt ? 1 : 2);
+    return players.slice().sort((x, y) => ((x.outT === -1) - (y.outT === -1)) || (scoredAny(x) - scoredAny(y)) || order(x, y)).map((p) => p.seat);
   }
   game.hud = (seat) => { const p = players.find((x) => x.seat === seat); return p.out ? 'TURRET' : '@'.repeat(p.lives); };
   Object.defineProperty(game, 'timeLeft', { get: () => Math.max(0, TIME - t) });
@@ -230,7 +234,7 @@ export function create(ctx) {
     for (const q of bumpers) { g.circle(q.x, q.y, q.r, q.flash > 0 ? '#ffffff' : '#1f6a3a'); g.ring(q.x, q.y, q.r, '#7dff8a'); g.circle(q.x, q.y, q.r * 0.4, '#7dff8a'); }
     pickups.draw(g);
     for (const b of balls) {
-      if (b.wait > 0 && Math.floor(t * 10) % 2) continue;
+      if (b.wait > 0 && Math.floor(t * 5) % 2) continue;
       g.circle(b.x + 1, b.y + 2, b.r, '#00000066');
       g.circle(b.x, b.y, b.r, '#f0f0ff');
       for (let k = 0; k < 4; k++) { const a = b.spin + k * TAU / 4; g.rect(b.x + Math.cos(a) * 3 - 1, b.y + Math.sin(a) * 3 - 1, 2, 2, '#2a2a3a'); }
@@ -246,10 +250,10 @@ export function create(ctx) {
         continue;
       }
       g.alpha(0.3); g.rect(p.x - 4 * p.st.size, p.y + p.r - 1, 8 * p.st.size, 2, '#000'); g.alpha(1);
-      drawPlayer(g, p.idx, p.x, p.y + p.r, { flip: p.face < 0, size: p.st.size * 0.9, flash: p.flashT > 0 });
+      drawPlayer(g, p.idx, p.x, p.y + p.r, { flip: p.face < 0, size: p.st.size * 0.9, flash: p.flashT > 0, look: p.aim });
+      drawArm(g, p, p.x, p.y, p.st.size * 0.9);
       if (p.blockT > 0) g.ring(p.x, p.y, p.r + 4, '#5affd9');
       if (p.shields) g.ring(p.x, p.y, p.r + 3, '#9fd3ff55');
-      g.rect(p.x + Math.cos(p.aim || 0) * 8 - 0.5, p.y + Math.sin(p.aim || 0) * 8 - 0.5, 1, 1, '#fff');
       drawTag(g, p.idx, p.x, p.y - 7 * p.st.size);
       drawBuffs(g, p, p.x, p.y + p.r + 2);
     }

@@ -4,7 +4,7 @@
 // everyone, right now. Words that make no sense in a sentence do nothing.
 // Goal: most gems. From 30 s the sentences lock one by one.
 import { clamp, rand, approach } from '../engine/util.js';
-import { drawPlayer, drawTag, SEAT_COLORS } from '../engine/sprites.js';
+import { drawPlayer, drawTag, drawArm, SEAT_COLORS } from '../engine/sprites.js';
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
@@ -12,6 +12,8 @@ import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js'
 export const meta = {
   id: 'rules', name: 'RULE BREAKER', color: '#ffe14a', music: 'coins', tier: 3,
   tagline: 'The rules are blocks. Push them.',
+  broken: 'THE RULES', // the rule the Cabinet breaks in this event
+  finale: true,
   card: { rule: 'MOST GEMS WINS', rule2: 'PUSH WORDS TO CHANGE THE RULES', keys: [['X', 'SHOOT'], ['A', 'DASH'], ['RB', 'BLOCK']], danger: 'WHATEVER THE RULES SAY' },
   objective: 'Most gems wins. Push word blocks into the sentences to change the rules for everyone.',
   controls: [['STICK', 'Move (walk into words)'], ['X / RT', 'Shoot (shots push words too)'], ['A', 'Dash'], ['RB', 'Block']],
@@ -177,7 +179,7 @@ export function create(ctx) {
     p.invT = 0.9; p.stun = 0.25; p.flashT = 0.15; p.taken += 1;
     p.vx += dx * 170 * p.st.knockTaken * m.knock; p.vy += dy * 170 * p.st.knockTaken * m.knock;
     if (p.gems > 0) { p.gems -= 1; const a = rand(0, Math.PI * 2); addGem(p.x, p.y, false, Math.cos(a) * 90, Math.sin(a) * 90); fx.popup('-1', p.x, p.y - 14, '#ff5a5a', 1); }
-    fx.shake(0.18); sound.sfx('hit'); fx.burst(p.x, p.y, 10, SEAT_COLORS[p.idx], { speed: 90, life: 0.4 });
+    fx.impact(p.x, p.y, { dmg: 20, col: SEAT_COLORS[p.idx], dx: dx, dy: dy }); sound.sfx('hit');
     void from;
     return 'hit';
   }
@@ -312,8 +314,10 @@ export function create(ctx) {
   }
 
   game.draw = (g) => {
-    g.rect(0, 0, 320, 180, '#0f0d1a', true);
-    for (let y = TOP; y < BOT; y += 8) for (let x = 0; x < 320; x += 8) g.rect(x + 3, y + 3, 1, 1, '#1d1a30', true);
+    const D = (c) => (ctx.drift ? ctx.drift.col(c, 'bg') : c);
+    g.rect(0, 0, 320, 180, D('#0f0d1a'), true);
+    const dot = D('#1d1a30');
+    for (let y = TOP; y < BOT; y += 8) for (let x = 0; x < 320; x += 8) g.rect(x + 3, y + 3, 1, 1, dot, true);
     for (const sn of sentences) {
       tile(g, sn.sx, sn.y, sn.sw, sn.id, 'subject');
       tile(g, sn.vx, sn.y, sn.vw, sn.verb, 'verb');
@@ -335,9 +339,10 @@ export function create(ctx) {
     guns.draw(g);
     const lead = leader();
     for (const p of players) {
-      const blink = p.invT > 0 && Math.floor(t * 16) % 2;
+      const blink = p.invT > 0 && Math.floor(t * 5) % 2;
       g.alpha(0.3); g.rect(p.x - 4, p.y + p.r - 1, 8, 2, '#000'); g.alpha(1);
-      drawPlayer(g, p.idx, p.x, p.y + p.r, { flip: p.face < 0, size: p.r / 5 * 0.9, flash: p.flashT > 0, alpha: p.ghost ? 0.35 : blink ? 0.4 : 1 });
+      drawPlayer(g, p.idx, p.x, p.y + p.r, { flip: p.face < 0, size: p.r / 5 * 0.9, flash: p.flashT > 0, alpha: p.ghost ? 0.35 : blink ? 0.4 : 1, look: p.aim });
+      drawArm(g, p, p.x, p.y, p.r / 5 * 0.9);
       if (p.blockT > 0) g.ring(p.x, p.y, p.r + 4, '#5affd9');
       if (p === lead) g.text('LEADER', p.x, p.y - p.r * 2.6 - 10, { scale: 1, col: '#ffe14a', align: 'center', ui: false, shadow: null });
       drawBuffs(g, p, p.x, p.y + p.r + 2);

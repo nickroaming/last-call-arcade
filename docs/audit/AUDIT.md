@@ -124,6 +124,23 @@ Goal from the brief: make the game feel higher end. Method: measure every event 
 
 **Performance** (same pane, `performance.now()` around each fixed step + draw, 600 steps per arena, active 3-player Orbit): median 0.3–0.4 ms, p95 0.7–1.7 ms. Every arena showed one ~41 ms step about every 1.2 s. It also appears when **only drawing** a still screen, and the old build shows more of it (22 spikes, max 67 ms, on its title screen), so it is the hidden browser pane's canvas flush, not game code. **[A]** The real Series X frame pacing is still unmeasured.
 
+### Pass 4: the night (build `m1-2026-11-20.10-night`, branch `quality/facelift`, 2026-11-20)
+Goal from the brief: a facelift for the whole game, the audit's open items, and a concept you can feel ("that ah-ha moment when I realize this game was really well crafted").
+
+| ID | Scene | Sev. | Evidence | What happens | Why it matters | Change | Check | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **F-22** | Whole night | Major (identity) | [O] captures, [C] the Cabinet appears nowhere in code | The story frame (a cabinet that wakes and breaks rules) exists only in the design doc. Players see unrelated minigames. | Without a thread, a party game feels like a pile of prototypes. | The night layer (`src/game/night.js`): the Cabinet on the title, act break screens, the night clock and strip, a broken rule on every act 2 and 3 card, results quips, an end-of-night recap. The night opens with Rooftop and ends with Rule Breaker. | Full night with CPUs reaches the recap; unit tests for order, clock, winners | Shipped |
+| **F-23** | Menus | Minor (polish) | [O] | Each menu had its own striped background. | No shared look. | One stage per act (amber → cyan → magenta), scanlines and CRT bezel. | Captures | Shipped |
+| **F-24** | Draft | Major (fairness promise) | backlog B-08 | Last place got the same three cards as second. | The comeback promise was copy only. | Last place gets a 4th card; "LAST PLACE GETS A 4TH CARD" on open; "+1" in their header. | `night_draft_4cards.png` | Shipped |
+| **F-25** | Lounge, Blast Ball, Echo | Major (fairness) | [O] measure table | An idle player won 30–55%. | Rewards not playing. | Lounge: the floor heats up under anyone still for 2.2 s ("DANCE!"). Blast Ball: goal difference, and you have to score (or at least play) to place above someone who did. Echo: a survivor who never landed a hit ranks below everyone who did. | Idle wins: Lounge 40% → 5%, Blast Ball 55% → 5%, Echo 30% → 0%; unit test with an idle seat | Shipped |
+| **F-26** | All events | Major (feel) | [C] | Seven events still had the 1-px aim dot and the flat hit. | Inconsistent feel across the night. | Guns record aim and last shot (`weapons.js`), so `drawArm` gives every event gun arms with recoil. Every hit goes through `fx.impact`. The freeze now has a cooldown (≤ ~30% of time under constant hits) so stacked powers can't stall a game. | Unit test: a hit every frame freezes < 35% of the time | Shipped |
+| **F-27** | Many events | Major (photosensitivity) | [C] `Math.floor(t * 10..20) % 2` | Warnings and invulnerability blinked at 5–10 Hz. | XAG 118 asks ≤ 3 Hz for large blinking. | All blinks in events are 2.5 Hz. | grep: none faster | Shipped |
+| **F-28** | Updraft | Minor (pacing) | [O] 6.9 s | Over before anyone climbs. | — | A 4 s teach beat, then a gentler rise. | 6.9 s → 11.1 s with CPUs | Partly: **[A]** the CPU can't really climb, so human length is unmeasured |
+
+**Event health after pass 4** (20 runs each, same method; length / idle wins): Rooftop 29.3 s / 0%, Coin Storm 32.9 / 5%, Tick Tock 22.3 / 0%, Orbit 28.0 / 0%, Lights Out 38.4 / 0%, Mirror 50.2 / 0%, Mobius 39.7 / 0%, Wormhole 52.9 / 0%, Rule Breaker 54.9 / 0%, Lounge 13.8 / **5%**, Blast Ball 54.2 / **5%**, Echo 13.5 / **0%**, Splat 36.1 / 0%, Still Life 55.7 / 0%, Updraft 11.1 / 0%, Dust Lap 56.0 / 25%.
+
+**[A]** Dust Lap's 25% is likely the CPU driver crashing more than an idle car sitting still; it needs a human race to judge. Lounge, Echo and Updraft are still short with CPUs.
+
 ### Matched before / after
 | Screen | Sheet | What to look at |
 | --- | --- | --- |
@@ -138,6 +155,9 @@ Goal from the brief: make the game feel higher end. Method: measure every event 
 | Orbit play (core pass) | `captures/compare_core_orbit_play.png` | One life → rounds with pips and MATCH POINT, gun arms, upright health bars |
 | Mobius (core pass) | `captures/compare_core_mobius.png` | Strobing horizon → calm line; round banner explains a land-a-hit decision |
 | Title (core pass) | `captures/compare_core_title.png` | Tiny settings line → OPTIONS prompt; steady join prompt |
+| Title (night) | `captures/compare_night_title.png` | Neon sun → the Cabinet types the premise |
+| Intro (night) | `captures/compare_night_intro.png` | "EVENT 4 OF 8" → clock + night strip |
+| New screens (night) | `captures/night_new_screens.png` | Act break and the end-of-night recap |
 
 ### Assumptions and open questions
 - **[A]** Text size math assumes the 640×360 canvas fills a 1080p TV (Edge full screen). If Edge shows its address bar, the game is a little smaller still.

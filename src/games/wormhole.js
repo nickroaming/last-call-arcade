@@ -15,6 +15,7 @@ import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js'
 export const meta = {
   id: 'wormhole', name: 'WORMHOLE', color: '#ffb03a', music: 'rumble', tier: 3,
   tagline: 'Shoot holes in space. Keep your speed.',
+  broken: 'SPACE', // the rule the Cabinet breaks in this event
   objective: 'Hold the orb the longest. Shots punch holes: go in one of yours, come out the other.',
   card: { rule: 'HOLD THE ORB THE LONGEST', rule2: 'YOUR SHOTS MAKE 2 HOLES: IN ONE, OUT THE OTHER', keys: [['A', 'JUMP'], ['X', 'SHOOT A HOLE'], ['RB', 'BLOCK']], danger: 'SHOTS DROP THE ORB. LAVA FLOOR AT 25 S' },
   controls: [['STICK', 'Move and aim'], ['A', 'Jump (double jump)'], ['X / RT', 'Shoot a hole into a wall'], ['RB', 'Block']],

@@ -237,6 +237,14 @@ export function drawGun(g, idx, x, y, a, { size = 1, recoil = 0, alpha = 1 } = {
   g.alpha(1);
 }
 
+/** The arm for any player whose gun records `aim` and `recoilAt` (src/game/weapons.js). */
+export function drawArm(g, p, x, y, size = 1, alpha = 1) {
+  if (p.aim == null || p.ghost === true || p.out) return;
+  const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+  const recoil = p.recoilAt ? Math.max(0, 1 - (now - p.recoilAt) / 0.18) : 0;
+  drawGun(g, p.idx, x, y, p.aim, { size, recoil, alpha });
+}
+
 /** Small "P1" tag with an arrow, drawn above a player. Large text doubles it. */
 export function drawTag(g, idx, x, y) {
   const label = 'P' + (idx + 1);

@@ -25,6 +25,7 @@ import * as wormhole from '../src/games/wormhole.js';
 import * as rules from '../src/games/rules.js';
 import * as still from '../src/games/still.js';
 import { Bot } from '../src/game/bots.js';
+import { clockAt } from '../src/game/night.js';
 
 const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout, mobius, echo, mirror, wormhole, rules, still };
 export const results = [];
@@ -383,7 +384,8 @@ for (const id of ['orbit', 'mobius']) {
       ok(game.finished, 'finished');
       ok(game.round >= 2, `only ${game.round} round(s) in v${v}`);
       ok(secs <= 62, `took ${secs}s`);
-      eq(game.ranking[0], game.players.slice().sort((a, b) => b.wins - a.wins)[0].seat, 'most round wins ranks first');
+      const top = Math.max(...game.players.map((p) => p.wins));
+      eq(game.players.find((p) => p.seat === game.ranking[0]).wins, top, 'most round wins ranks first');
       ok(game.hudInfo(1).pipMax === 2, 'HUD shows round pips');
     }
   });
@@ -413,6 +415,9 @@ test('impact: the freeze grows with damage and is capped', () => {
   const fx2 = new Fx(); fx2.impact(10, 10, { dmg: 60 }); const big = fx2.hitstop;
   ok(big > small, 'bigger hit, longer freeze');
   const fx3 = new Fx(); fx3.impact(10, 10, { dmg: 999 }); ok(fx3.hitstop <= 0.1 + 1e-9, 'capped at 100 ms');
+  const fx5 = new Fx(); let frozen = 0;
+  for (let k = 0; k < 600; k++) { fx5.impact(10, 10, { dmg: 60 }); if (fx5.timeScale() === 0) frozen++; fx5.update(1 / 60); }
+  ok(frozen / 600 < 0.35, `a hit every frame freezes ${Math.round(frozen / 6)}% of the time`);
   const fx4 = new Fx(); fx4.calm = true; fx4.impact(10, 10, { dmg: 40 }); eq(fx4.trauma, 0, 'calm mode: no shake');
 });
 test('core set: real events, three per act, enough for an 8-event night with no repeats', () => {
@@ -435,3 +440,47 @@ test('intro cards fit on screen at reading size', () => {
     ok(g.textW('DANGER ' + c.danger, 2) <= 300, `${id} danger too wide`);
   }
 });
+
+// ---- the night (build .10-night) ----
+test('the night opens with Rooftop and ends with Rule Breaker, acts in order', () => {
+  const core = ['rumble', 'coins', 'tick', 'orbit', 'lightsout', 'mirror', 'mobius', 'wormhole', 'rules'];
+  const tierOf = (id) => GAMES[id].meta.tier || 1;
+  const roleOf = (id) => (GAMES[id].meta.opener ? 'opener' : GAMES[id].meta.finale ? 'finale' : null);
+  for (let k = 0; k < 100; k++) {
+    const p = makePlaylist(core, 2, Math.random, 8, tierOf, roleOf);
+    eq(p[0], 'rumble', 'opener'); eq(p[7], 'rules', 'finale');
+    ok(p.every((g, i) => i === 0 || tierOf(g) >= tierOf(p[i - 1])), 'acts in order');
+  }
+});
+test('every act 2 and 3 event names the rule the Cabinet breaks; act 1 breaks none', () => {
+  for (const [id, m] of Object.entries(GAMES)) {
+    const t = m.meta.tier || 1;
+    if (t >= 2) ok(m.meta.broken, `${id} has no broken rule`); else ok(!m.meta.broken, `${id} is act 1 but breaks a rule`);
+  }
+});
+test('every event has a short intro card', () => {
+  for (const [id, m] of Object.entries(GAMES)) ok(m.meta.card && m.meta.card.rule && m.meta.card.danger, `${id} has no card`);
+});
+test('match records each event winner for the night strip and recap', () => {
+  const m = new Match([1, 2, 3], ['a', 'b', 'c', 'd'], { total: 3 });
+  m.award([2, 1, 3]); m.advance(); m.award([3, 2, 1]);
+  eq(m.winners, [2, 3]);
+});
+test('night clock: 11 PM start, midnight for act 2, 1 AM for act 3, 2 AM after', () => {
+  const pl = ['a', 'b', 'c', 'd', 'e', 'f'], tier = { a: 1, b: 1, c: 2, d: 2, e: 3, f: 3 };
+  const tf = (id) => tier[id];
+  eq(clockAt(pl, 0, tf), '11:00 PM'); eq(clockAt(pl, 1, tf), '11:30 PM'); eq(clockAt(pl, 2, tf), '12:00 AM'); eq(clockAt(pl, 4, tf), '1:00 AM'); eq(clockAt(pl, 6, tf), '2:00 AM');
+});
+for (const id of ['lounge', 'blastball', 'echo']) {
+  test(`${id}: a player who never touches the controller cannot win`, () => {
+    for (let v = 0; v < 6; v++) {
+      const fx = new Fx();
+      const game = GAMES[id].create({ fx, sound: NO_SOUND, variant: v, players: [1, 2, 3].map((s) => ({ seat: s, idx: s - 1, stats: statsFor({}), pickupMult: 1 })) });
+      const others = bots([2, 3]);
+      let n = 0;
+      while (!game.finished && n < 60 * 80) { const m = others(1 / 60); m.set(1, NO_CONTROLS); fx.update(1 / 60); game.update(1 / 60 * (fx.timeScale() || 0.0001), m); n++; }
+      ok(game.finished, 'finished');
+      ok(game.ranking[0] !== 1, `idle seat 1 won ${id} v${v}`);
+    }
+  });
+}

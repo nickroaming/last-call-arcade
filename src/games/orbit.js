@@ -13,6 +13,7 @@ import { makeRounds } from '../game/rounds.js';
 export const meta = {
   id: 'orbit', name: 'ORBIT OUTPOST', color: '#b48cff', music: 'lounge', tier: 2,
   tagline: 'Tiny planets with their own gravity',
+  broken: 'GRAVITY', // the rule the Cabinet breaks in this event
   objective: 'Last one standing takes the round, if they landed a hit. First to 2. Bullets curve into orbits.',
   card: { rule: 'RUN ALL THE WAY AROUND THE PLANET', rule2: 'LAST STANDING + A HIT = ROUND. FIRST TO 2', keys: [['A', 'JUMP'], ['X', 'SHOOT'], ['RB', 'BLOCK']], danger: 'MOONS, METEORS, FIRE VENTS' },
   controls: [['STICK', 'Run around the planet / aim'], ['A', 'Jump (double jump)'], ['X / RT', 'Shoot'], ['RB', 'Block'], ['R-STICK', 'Aim freely']],

@@ -4,7 +4,7 @@
 // them, and touching any echo (even your own) is a paradox that hurts.
 // By the end you are dodging your own past.
 import { TAU, clamp, rand, approach } from '../engine/util.js';
-import { drawPlayer, drawTag, SEAT_COLORS } from '../engine/sprites.js';
+import { drawPlayer, drawTag, drawArm, SEAT_COLORS } from '../engine/sprites.js';
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
@@ -12,6 +12,8 @@ import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js'
 export const meta = {
   id: 'echo', name: 'ECHO CHAMBER', color: '#5affd9', music: 'lounge', tier: 3,
   tagline: 'Every 5 seconds your past self comes back',
+  card: { rule: 'EVERY 5 S YOUR PAST SELF REPLAYS', rule2: 'ITS SHOTS HIT EVERYONE. EVEN YOU', keys: [['X', 'SHOOT'], ['A', 'DASH'], ['RB', 'BLOCK']], danger: 'ECHOES. ALL OF THEM' },
+  broken: 'THE PAST', // the rule the Cabinet breaks in this event
   objective: 'Last one standing. Every 5 s your past self replays. Its shots hit everyone, even you.',
   controls: [['STICK', 'Move and aim'], ['X / RT', 'Shoot (echoes repeat it)'], ['A', 'Dash'], ['RB', 'Block']],
   hazards: 'Your echoes / their echoes / touching any echo hurts / after 30 s echoes speed up',
@@ -60,8 +62,7 @@ export function create(ctx) {
     if (p.shields > 0) { p.shields -= 1; p.invT = 0.6; fx.popup('AIRBAG!', p.x, p.y - 12, '#9fd3ff', 1); sound.sfx('block'); return 'blocked'; }
     p.hearts -= 1; p.invT = 1.1; p.flashT = 0.15; p.stun = 0.2;
     p.vx += dx * 160 * p.st.knockTaken; p.vy += dy * 160 * p.st.knockTaken;
-    fx.shake(0.25); fx.stop(0.04); sound.sfx('hit');
-    fx.burst(p.x, p.y, 12, SEAT_COLORS[p.idx], { speed: 100, life: 0.4 });
+    fx.impact(p.x, p.y, { dmg: 34, col: SEAT_COLORS[p.idx], dx: dx, dy: dy }); sound.sfx('hitBig');
     const who = from ? (from.src ? (from.src === p ? 'YOUR PAST!' : `P${from.src.idx + 1}'S ECHO`) : null) : null;
     if (who) fx.popup(who, p.x, p.y - 14, from.src === p ? '#ff5fd2' : '#5affd9', 1);
     const credit = from && (from.src || from);
@@ -171,7 +172,10 @@ export function create(ctx) {
   function rank() {
     const a = alive().sort((x, y) => (y.hearts - x.hearts) || (y.hits - x.hits));
     const d = players.filter((p) => p.out).sort((x, y) => (y.outT - x.outT) || (y.hits - x.hits));
-    return [...a, ...d].map((p) => p.seat);
+    // land a hit to place: a survivor who never hit anyone drops below everyone who did (same rule as the rounds)
+    const all = [...a, ...d];
+    const fought = all.filter((p) => p.hits > 0 && p.outT !== -1), idle = all.filter((p) => !(p.hits > 0 && p.outT !== -1));
+    return (fought.length ? [...fought, ...idle] : all).map((p) => p.seat);
   }
   game.hud = (seat) => { const p = players.find((x) => x.seat === seat); return p.out ? `ECHOES ${echoes.filter((e) => e.src === p).length}` : `HP ${Math.max(0, p.hearts)}  HITS ${p.hits}`; };
   game.botTarget = (seat) => {
@@ -195,7 +199,7 @@ export function create(ctx) {
     for (let y = TOP; y < BOT; y += 20) for (let x = 0; x < 320; x += 20) g.rect(x + 9, y + 9, 2, 2, '#0e2e2e', true);
     g.text(L.name, 160, 24, { scale: 1, col: '#5affd955', align: 'center', ui: false, shadow: null });
     // loop timer bar
-    g.rect(40, TOP + 1, 240, 3, '#0e2e2e'); g.rect(40, TOP + 1, 240 * k, 3, k > 0.8 && Math.floor(t * 10) % 2 ? '#ff5fd2' : '#5affd9');
+    g.rect(40, TOP + 1, 240, 3, '#0e2e2e'); g.rect(40, TOP + 1, 240 * k, 3, k > 0.8 && Math.floor(t * 5) % 2 ? '#ff5fd2' : '#5affd9');
     g.text(slip ? 'REC x1.5' : 'REC', 36, TOP, { scale: 1, col: Math.floor(t * 2) % 2 ? '#ff5a5a' : '#5a2a2a', align: 'right', ui: false, shadow: null });
     for (const q of pillars) { g.circle(q.x, q.y, q.r, '#123838'); g.ring(q.x, q.y, q.r, '#5affd9'); g.circle(q.x, q.y, 2, '#5affd9'); }
     pickups.draw(g);
@@ -211,11 +215,11 @@ export function create(ctx) {
     guns.draw(g);
     for (const p of players) {
       if (p.out) continue;
-      const blink = p.invT > 0 && Math.floor(t * 16) % 2;
+      const blink = p.invT > 0 && Math.floor(t * 5) % 2;
       g.alpha(0.3); g.rect(p.x - 4, p.y + p.r - 1, 8, 2, '#000'); g.alpha(1);
-      drawPlayer(g, p.idx, p.x, p.y + p.r, { flip: p.face < 0, size: p.st.size * 0.9, flash: p.flashT > 0, alpha: blink ? 0.4 : 1 });
+      drawPlayer(g, p.idx, p.x, p.y + p.r, { flip: p.face < 0, size: p.st.size * 0.9, flash: p.flashT > 0, alpha: blink ? 0.4 : 1, look: p.aim });
+      drawArm(g, p, p.x, p.y, p.st.size * 0.9);
       if (p.blockT > 0) g.ring(p.x, p.y, p.r + 4, '#5affd9');
-      g.rect(p.x + Math.cos(p.aim) * 9 - 0.5, p.y + Math.sin(p.aim) * 9 - 0.5, 1, 1, '#fff');
       for (let h = 0; h < p.maxHearts; h++) g.rect(p.x - p.maxHearts * 2 + h * 4, p.y - 12 * p.st.size - 4, 3, 2, h < p.hearts ? '#ff5a7a' : '#3a2030');
       drawBuffs(g, p, p.x, p.y + p.r + 2);
       drawTag(g, p.idx, p.x, p.y - 12 * p.st.size - 6);

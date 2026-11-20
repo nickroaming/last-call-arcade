@@ -13,8 +13,9 @@ import { TWISTS } from './twists.js';
 import { GAMES } from './registry.js';
 import { Bot } from './bots.js';
 import { Drift, P, glyph, prompt } from '../engine/style.js';
+import { ACTS, clockAt, cabinetQuip, drawStage, drawCrt, drawBezel, drawVoice, drawCabinet, drawNightStrip } from './night.js';
 
-export const BUILD = 'm1-2026-11-20.9-core';
+export const BUILD = 'm1-2026-11-20.10-night';
 export { GAMES };
 // The core set: the events that pass the quality bar (docs/PLAYTEST.md, tests/measure.html).
 // Three per act, so every night builds from grounded to mind-bending. ALL EVENTS adds the rest.
@@ -104,6 +105,7 @@ const st = {
   draft: null, awards: null, prompt: null, paused: false, sdWinner: null, finalOrder: null, viewHold: {}, events: [], opts: null, wipe: 0,
 };
 const WIPE = 0.42;
+const RECAP_STEP = 0.32;
 function go(screen) {
   // a short shutter between screens; in-play changes (countdown → play → finish) don't wipe
   if (!['play', 'finish'].includes(screen) && screen !== st.screen) st.wipe = WIPE;
@@ -113,11 +115,14 @@ const seatsInMatch = () => (st.match ? st.match.players.map((p) => p.seat) : [])
 const seatObj = (n) => input.seats[n - 1];
 const anyPressed = (b, seats = null) => input.seats.some((s) => (!seats || seats.includes(s.n)) && s.pressed(b));
 
+const tierOf = (id) => GAMES[id].meta.tier || 1;
+const curAct = () => (st.match && st.gameId ? tierOf(st.gameId) : 0);
+const nightClock = (i) => clockAt(st.match.playlist, i, tierOf);
 function startMatch() {
   const seats = input.seats.filter((s) => s.active).map((s) => s.n);
   input.joinOpen = false;
   const list = ONLY && GAMES[ONLY] ? [ONLY] : settings.set === 'all' ? GAME_IDS : CORE;
-  st.match = new Match(seats, list, { perGame: ONLY ? 4 : 2, total: ONLY ? 4 : EVENTS, tierOf: ONLY ? null : (id) => GAMES[id].meta.tier || 1 });
+  st.match = new Match(seats, list, { perGame: ONLY ? 4 : 2, total: ONLY ? 4 : EVENTS, tierOf: ONLY ? null : tierOf, roleOf: (id) => (GAMES[id].meta.opener ? 'opener' : GAMES[id].meta.finale ? 'finale' : null) });
   st.variants = {}; st.sdWinner = null;
   toIntro();
 }
@@ -129,6 +134,17 @@ function toIntro() {
   if (FORCE_TWIST && TWISTS[FORCE_TWIST]) st.twistId = FORCE_TWIST;
   else if (!st.match.suddenDeath && st.match.eventIdx >= 1 && m.twists && m.twists.length && Math.random() < TWIST_CHANCE) st.twistId = choice(m.twists);
   st.twist = st.twistId ? { id: st.twistId, ...TWISTS[st.twistId] } : null;
+  // a new act opens with the Cabinet speaking (not in practice or sudden death)
+  const i = st.match.eventIdx;
+  const prevAct = i > 0 ? tierOf(st.match.playlist[i - 1]) : 0;
+  if (!ONLY && !st.match.suddenDeath && tierOf(st.gameId) !== prevAct) {
+    const k = tierOf(st.gameId);
+    const rules = st.match.playlist.filter((id) => tierOf(id) === k).map((id) => GAMES[id].meta.broken).filter(Boolean);
+    st.act = { k, clock: nightClock(i), rules: [...new Set(rules)] };
+    go('act');
+    sound.music(null); sound.sfx('act');
+    return;
+  }
   go('intro');
   sound.music('results');
 }
@@ -160,6 +176,7 @@ function finishGame() {
     st.awards = null;
   } else {
     st.awards = st.match.award(ranking);
+    st.quip = st.match.isLast ? null : cabinetQuip(st.match, st.awards);
   }
   go('finish');
   sound.sfx('win');
@@ -170,7 +187,8 @@ function afterResults() {
   if (order.length) {
     st.draft = {
       next: st.match.next,
-      pickers: order.map((seat) => ({ seat, hand: st.match.offer(seat), cur: 0, picked: null, lockedAt: null })),
+      // last place gets a fourth card: a real comeback, not a promise (B-08)
+      pickers: order.map((seat, k) => ({ seat, last: k === 0 && order.length > 1, hand: st.match.offer(seat, k === 0 && order.length > 1 ? 4 : 3), cur: 0, picked: null, lockedAt: null })),
       deadline: DRAFT_TIME, doneAt: null,
     };
     go('draft');
@@ -194,6 +212,8 @@ function finishDraft() {
 }
 function toFinal() {
   st.finalOrder = st.match.finalOrder(st.sdWinner);
+  if (!ONLY && !st.recapDone) { go('recap'); sound.music(null); return; } // the night, laid out, before the podium
+  st.recapDone = false;
   go('final');
   sound.music('title');
   sound.sfx('win');
@@ -269,6 +289,19 @@ function update(dt) {
   fx.update(dt);
 
   switch (st.screen) {
+    case 'act': {
+      voiceTick(dt, 0.5, ACTS[st.act.k].line, 32);
+      if ((st.t > 1.4 && anyPressed(BTN.A, inMatch)) || st.t > 6) { go('intro'); sound.music('results'); }
+      break;
+    }
+    case 'recap': {
+      const rows = st.match.playlist.length;
+      voiceTick(dt, 0.6 + rows * RECAP_STEP, 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', 40);
+      const k = Math.floor((st.t - 0.6) / RECAP_STEP);
+      if (k >= 0 && k < rows && k !== st.recapRow) { st.recapRow = k; sound.sfx('tick'); }
+      if (st.t > 0.6 + rows * RECAP_STEP + 0.8 && (anyPressed(BTN.A, inMatch) || st.t > 14)) { st.recapDone = true; st.recapRow = -1; toFinal(); }
+      break;
+    }
     case 'intro': {
       for (const n of inMatch) if (controls.get(n).jumpP && !st.ready.has(n) && st.t > 0.25) { st.ready.add(n); sound.sfx('ready'); }
       if ((st.ready.size >= inMatch.length && st.t > 0.6) || st.t > 9) startGame();
@@ -292,6 +325,7 @@ function update(dt) {
       break;
     }
     case 'results': {
+      if (st.quip && st.match.eventIdx > 0) voiceTick(dt, 0.8, st.quip, 32);
       if (st.t > 1.2 && (anyPressed(BTN.A, inMatch) || st.t > 6)) { if (!maybePrompt()) afterResults(); }
       break;
     }
@@ -314,6 +348,12 @@ function update(dt) {
   // the music leans in for the last seconds and at match point
   const g2 = st.game;
   sound.intensity = st.screen === 'play' && g2 && !g2.finished && (g2.timeLeft < 10 || (g2.matchPoint && g2.matchPoint())) ? 1 : 0;
+}
+
+/** A soft blip every other character while the Cabinet types. */
+function voiceTick(dt, start, text, speed) {
+  const n0 = Math.floor((st.t - dt - start) * speed), n1 = Math.floor((st.t - start) * speed);
+  if (n1 > n0 && n1 > 0 && n1 <= text.length && n1 % 2 === 0) sound.sfx('type');
 }
 
 function tipsyControls(controls, dt) {
@@ -415,8 +455,9 @@ function updateDraft(controls) {
     if (p.picked) continue;
     if (st.t < DRAFT_GUARD) continue; // a press carried over from results can't pick (F-11)
     const c = controls.get(p.seat) || NO_CONTROLS;
-    if (c.upP) { p.cur = (p.cur + 2) % 3; sound.sfx('move'); }
-    if (c.downP) { p.cur = (p.cur + 1) % 3; sound.sfx('move'); }
+    const hn = p.hand.length;
+    if (c.upP) { p.cur = (p.cur + hn - 1) % hn; sound.sfx('move'); }
+    if (c.downP) { p.cur = (p.cur + 1) % hn; sound.sfx('move'); }
     if (c.jumpP) {
       p.picked = p.hand[p.cur]; p.lockedAt = st.t; sound.sfx('lock');
       d.deadline = Math.min(d.deadline, st.t + DRAFT_AFTER_LOCK);
@@ -444,12 +485,6 @@ function panel(x, y, w, h, border = '#5b4f8a', fill = '#120f24') {
   g.rect(x, y, w, h, fill, true);
   g.frame(x, y, w, h, border, 1, true);
 }
-function bg(t, colA = '#1a0f33', colB = '#2b0f3f') {
-  g.rect(0, 0, 320, 180, colA, true);
-  for (let y = 0; y < 180; y += 6) { g.alpha(0.25 + 0.2 * Math.sin(y * 0.05 + t)); g.rect(0, y, 320, 3, colB, true); }
-  g.alpha(1);
-  for (let x = -20; x < 340; x += 20) { const xx = (x + t * 10) % 340; g.rect(xx, 0, 1, 180, '#ffffff08', true); }
-}
 const ordinal = (n) => ['1ST', '2ND', '3RD'][n - 1] || `${n}TH`;
 function seatLabel(n) { return `P${n} ${SEAT_NAMES[n - 1]}`; }
 
@@ -464,8 +499,12 @@ function draw() {
     case 'results': case 'prompt': drawResults(); if (st.screen === 'prompt') drawPrompt(); break;
     case 'draft': drawDraft(); break;
     case 'final': drawFinal(); break;
+    case 'act': drawAct(); break;
+    case 'recap': drawRecap(); break;
     default: break;
   }
+  // everything is the Cabinet's screen: scanlines on menus, the glass bezel everywhere
+  if (['countdown', 'play', 'finish'].includes(st.screen)) drawBezel(g); else drawCrt(g);
   fx.drawFlash(g);
   if (st.paused) drawPause();
   if (st.opts) drawOptions();
@@ -489,10 +528,10 @@ function drawWipe() {
 
 function drawTitle() {
   const t = performance.now() / 1000;
-  bg(t, '#140b2a', '#3a0f4a');
-  // sun
-  for (let k = 0; k < 8; k++) { g.rect(116, 70 + k * 4.5, 88, 3, k % 2 ? '#ff5fd2' : '#ff9a2e', true); }
+  drawStage(g, 0, t, drift, { calm: settings.calm });
+  // the bar floor, then the Cabinet: the narrator of the night, centre stage
   g.rect(0, 108, 320, 72, '#0d0820', true);
+  drawTitleCabinet(t);
   for (let k = 0; k < 8; k++) g.rect(0, 112 + k * k * 1.2, 320, 1, '#ff5fd255', true);
   const wob = (i) => Math.sin(t * 3 + i * 0.5) * 2;
   const logo = 'LAST CALL';
@@ -527,10 +566,30 @@ function drawTitle() {
   fxx += prompt(g, 'RT', 'ADD CPU', fxx, 161) + 10;
   g.text(`${settings.set === 'all' ? 'ALL 16' : 'CORE 9'} EVENTS${settings.calm ? '  CALM' : ''}`, 310, 162, { scale: 2, col: P.dim, align: 'right', shadow: null });
   const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter((p2) => p2 && p2.connected) : [];
-  if (!pads.length) g.text('KEYS: WASD MOVE  SPACE=A  F=SHOOT  G=BLOCK  IJKL=AIM  ENTER=START  C=ADD CPU  R=OPTIONS', 160, 173, { scale: 1, col: '#9a90c0', align: 'center' });
+  if (sound.blocked && !settings.muted) g.text('SOUND STARTS AFTER YOUR FIRST BUTTON PRESS', 160, 173, { scale: 1, col: P.warn, align: 'center' });
+  else if (!pads.length) g.text('KEYS: WASD MOVE  SPACE=A  F=SHOOT  G=BLOCK  IJKL=AIM  ENTER=START  C=ADD CPU  R=OPTIONS', 160, 173, { scale: 1, col: '#9a90c0', align: 'center' });
   g.text(BUILD, 318, 2, { scale: 1, col: '#5a5080', align: 'right' });
-  if (sound.blocked && !settings.muted) g.text('SOUND STARTS AFTER YOUR FIRST BUTTON PRESS', 160, 96, { scale: 1, col: '#ffd84a', align: 'center' });
+
   fx.draw(g);
+}
+
+const TITLE_LINES = ['THE BAR IS', 'CLOSED.', 'I AM NOT.'];
+function drawTitleCabinet(t) {
+  const x = 118, y = 72, w = 84;
+  g.alpha(0.25); g.rect(x - 10, y - 4, w + 20, 52, ACTS[0].accent, true); g.alpha(1); // neon glow
+  g.rect(x, y, w, 44, '#1a1630', true); g.frame(x, y, w, 44, '#6a5aa0', 1, true);
+  g.rect(x + 2, y + 2, w - 4, 6, '#ff5fd2', true); g.text('LAST CALL', x + w / 2, y + 2.5, { scale: 1, col: P.ink, align: 'center', shadow: null });
+  g.rect(x + 5, y + 11, w - 10, 26, '#07060c', true);
+  // the screen types its line, holds, and starts again
+  const cyc = t % 7, lines = TITLE_LINES;
+  let chars = Math.floor(cyc * 14);
+  lines.forEach((ln, k) => {
+    const shown = ln.slice(0, Math.max(0, chars)); chars -= ln.length + 3;
+    if (shown) g.text(shown, x + 9, y + 13 + k * 8, { scale: 2, col: P.warn, shadow: null });
+  });
+  g.alpha(0.08); g.rect(x + 5, y + 11, w - 10, 26, P.warn, true); g.alpha(1);
+  g.rect(x + 10, y + 38, w - 20, 4, '#2a2448', true);
+  g.rect(x + 6, y + 44, 6, 4, '#1a1630', true); g.rect(x + w - 12, y + 44, 6, 4, '#1a1630', true);
 }
 
 function readyStrip(y) {
@@ -556,16 +615,26 @@ function readyStrip(y) {
 function drawIntro() {
   const m = GAMES[st.gameId].meta;
   const t = st.t;
-  bg(t, '#120a24', m.color + '33');
   const sd = !!st.match.suddenDeath;
-  const ACTS = ['', 'WARM-UP', 'THE MACHINE WAKES', 'LAST CALL'];
-  const act = ONLY ? '' : ACTS[m.tier || 1];
-  g.text(sd ? 'SUDDEN DEATH!' : `EVENT ${st.match.eventIdx + 1} OF ${st.match.eventCount}` + (act ? ` - ${act}` : ''), 160, 6, { scale: 2, col: sd ? '#ff5a5a' : (m.tier === 3 ? '#ff5fd2' : m.tier === 2 ? '#9fd3ff' : '#c8c0ff'), align: 'center' });
+  const k = ONLY ? 1 : (m.tier || 1);
+  drawStage(g, sd ? 3 : k, t, drift, { calm: settings.calm });
+  // header: the night clock and the shape of the whole night
+  if (sd) g.text('SUDDEN DEATH', 160, 4, { scale: 2, col: P.danger, align: 'center' });
+  else if (ONLY) g.text(`PRACTICE ${st.match.eventIdx + 1} OF ${st.match.eventCount}`, 160, 4, { scale: 2, col: P.dim, align: 'center' });
+  else {
+    g.text(nightClock(st.match.eventIdx), 8, 4, { scale: 2, col: ACTS[k].accent, shadow: null });
+    drawNightStrip(g, 70, 5, 242, st.match.playlist, st.match.eventIdx, st.match.winners, tierOf, GAMES);
+  }
   const pop = Math.min(1, t * 4);
   g.text(m.name, 160, 16 + (1 - pop) * -20, { scale: 5, col: m.color, align: 'center', shadow: '#000' });
   if (st.twist) {
     g.text(`TWIST: ${st.twist.name}`, 160, 35, { scale: 2, col: P.warn, align: 'center' });
     g.text(st.twist.desc, 160, 43, { scale: 1, col: '#fff', align: 'center' });
+  } else if (m.broken && !ONLY) {
+    // the thread of the night: which rule the Cabinet breaks here
+    const a = 'THE CABINET BREAKS: ', w = g.textW(a + m.broken, 2);
+    g.text(a, 160 - w / 2, 37, { scale: 2, col: P.dim, shadow: null });
+    g.text(m.broken, 160 - w / 2 + g.textW(a, 2), 37, { scale: 2, col: ACTS[k].accent, shadow: null });
   } else g.text(m.tagline.toUpperCase(), 160, 37, { scale: 2, col: '#fff', align: 'center' });
   if (m.card) {
     // short card: two rule lines, three buttons, one danger line. Everything at reading size.
@@ -673,7 +742,7 @@ function drawPlay() {
 function drawResults() {
   const t = st.t;
   const m = GAMES[st.gameId].meta;
-  bg(t, '#0f0a20', '#22123a');
+  drawStage(g, st.match.suddenDeath ? 3 : (m.tier || 1), t, drift, { calm: settings.calm });
   g.text(`${m.name} RESULTS`, 160, 6, { scale: 3, col: m.color, align: 'center' });
   const awards = st.awards || st.lastRanking.map((seat, i) => ({ seat, place: i + 1, pts: 0 }));
   awards.forEach((a, k) => {
@@ -705,6 +774,7 @@ function drawResults() {
     const w = st.awards[0];
     g.text(`CURSE: P${w.seat} IS NOW ${TIPSY_NAMES[w.tipsy]}`, 160, 136, { scale: 2, col: '#ffb03a', align: 'center' });
     if (st.match.eventIdx === 0) g.text('WOBBLY STICK, SHAKY AIM. LOSERS GET 2X FROM ARENA POWER-UPS.', 160, 148, { scale: 1, col: P.dim, align: 'center' });
+    else if (st.quip && t > 0.8) drawVoice(g, st.quip, 160, 149, t - 0.8, { col: P.warn });
   }
   if (t > 1.2) { g.rect(96, 163, 128, 12, P.ink, true); prompt(g, 'A', 'CONTINUE', 160, 165, { col: P.good, align: 'center' }); }
   fx.draw(g);
@@ -722,7 +792,7 @@ function drawPrompt() {
 function drawDraft() {
   const d = st.draft;
   const t = st.t;
-  bg(t, '#0c0a1e', '#1a1440');
+  drawStage(g, tierOf(d.next), t, drift, { calm: settings.calm });
   g.text('COMEBACK DRAFT', 160, 3, { scale: 3, col: P.warn, align: 'center' });
   const winner = st.lastRanking[0];
   g.text(`P${winner} WON: NO CARD.  NEXT: ${GAMES[d.next].meta.name}`, 160, 17, { scale: 2, col: P.dim, align: 'center' });
@@ -735,7 +805,7 @@ function drawDraft() {
     const locked = !!p.picked;
     // column header: who, what place, and their state
     drawPlayer(g, i, x0 + 8, 42, { size: 1.2, squash: locked && !settings.calm ? Math.max(0, 0.5 - (t - p.lockedAt) * 2) : 0 });
-    g.text(`P${p.seat} ${ordinal(place)}`, x0 + 18, 29, { scale: 2, col: SEAT_COLORS[i], shadow: null });
+    g.text(`P${p.seat} ${ordinal(place)}` + (p.last && !locked ? ' +1' : ''), x0 + 18, 29, { scale: 2, col: SEAT_COLORS[i], shadow: null });
     g.text(locked ? (p.auto ? 'AUTO-PICKED' : 'LOCKED') : 'CHOOSING', x0 + colW, 29, { scale: 2, col: locked ? P.good : P.dim, align: 'right', shadow: null });
     let y = 45;
     p.hand.forEach((id, c) => {
@@ -746,10 +816,11 @@ function drawDraft() {
       const have = st.match.player(p.seat).powers[id] || 0;
       const rar = RARITY[pw.rarity];
       if (!focus && !chosen) {                        // browsing: a compact row
-        panel(x0, y, colW, 15, '#3a3458', P.panel);
-        g.rect(x0 + 3, y + 3, 9, 9, pw.col, true);
-        g.text(pw.name, x0 + 16, y + 4, { scale: 2, col: P.dim, shadow: null });
-        y += 18; return;
+        const rh = p.hand.length > 3 ? 12 : 15;
+        panel(x0, y, colW, rh, '#3a3458', P.panel);
+        g.rect(x0 + 3, y + (rh - 9) / 2, 9, 9, pw.col, true);
+        g.text(pw.name, x0 + 16, y + (rh - 7) / 2, { scale: 2, col: P.dim, shadow: null });
+        y += rh + (p.hand.length > 3 ? 2 : 3); return;
       }
       // focused or locked: the full card, everything at reading size
       const lines = cardLines(pw);
@@ -782,6 +853,7 @@ function drawDraft() {
   const waiting = d.pickers.filter((p) => !p.picked);
   g.rect(0, 156, 320, 24, P.ink, true);
   if (d.doneAt !== null) g.text('POWERS LOCKED IN', 160, 159, { scale: 2, col: P.good, align: 'center' });
+  else if (t < 2.2 && d.pickers.some((p) => p.last)) g.text(`LAST PLACE GETS A 4TH CARD`, 160, 159, { scale: 2, col: P.warn, align: 'center' });
   else if (waiting.length < d.pickers.length) g.text(`WAITING ON ${waiting.map((p) => 'P' + p.seat).join(' AND ')}: ${Math.ceil(left)}`, 160, 159, { scale: 2, col: P.warn, align: 'center' });
   else {
     const wv = g.textW('BROWSE', 2) + 17, wa = g.textW('LOCK IN', 2) + 17, wt = g.textW(`${Math.ceil(left)}s`, 2);
@@ -796,7 +868,7 @@ function drawDraft() {
 
 function drawFinal() {
   const t = st.t;
-  bg(t, '#140b2a', '#3a1a10');
+  drawStage(g, 0, t, drift, { calm: settings.calm });
   g.text('CHAMPION!', 160, 6, { scale: 4, col: '#ffd84a', align: 'center' });
   const order = st.finalOrder;
   const spots = [[160, 112, 40], [90, 128, 25], [230, 140, 15]];
@@ -810,14 +882,70 @@ function drawFinal() {
     drawPlayer(g, i, x, y - hop, { size: k === 0 ? 3 : 2 });
     g.text(seatLabel(seat), x, y - (k === 0 ? 48 : 34) - hop, { scale: 2, col: SEAT_COLORS[i], align: 'center' });
     g.text(`${p.points} PTS`, x, y + 18, { scale: 2, col: '#0b0a12', align: 'center', shadow: null });
+    const cards = Object.values(p.powers).reduce((a2, n2) => a2 + n2, 0);
+    if (cards) g.text(`${cards} CARD${cards > 1 ? 'S' : ''}`, x, y + 28, { scale: 1, col: '#0b0a12', align: 'center', shadow: null });
     void h;
   });
   if (st.sdWinner) g.text('WON IN SUDDEN DEATH', 160, 30, { scale: 1, col: '#ff5a5a', align: 'center' });
   if (t > 2) {
-    g.rect(0, 168, 320, 12, '#0b0a12', true);
-    g.text('A: REMATCH (SAME SEATS, POWERS RESET)    Y: NEW PLAYERS', 160, 171, { scale: 1, col: '#7dff8a', align: 'center' });
+    g.rect(0, 166, 320, 14, '#0b0a12', true);
+    let fx2 = 160 - 128;
+    fx2 += prompt(g, 'A', 'REMATCH', fx2, 170, { col: P.good }) + 14;
+    prompt(g, 'Y', 'NEW PLAYERS', fx2, 170, { col: P.text });
   }
   fx.draw(g);
+}
+
+/** An act begins: the Cabinet wakes a little more. The clock, the act, its line, the rules it will break. */
+function drawAct() {
+  const a = st.act, A = ACTS[a.k], t = st.t;
+  drawStage(g, a.k, t, drift, { calm: settings.calm });
+  // a glitch as the act lands (not in calm mode)
+  if (!settings.calm && t < 0.6) for (let k = 0; k < 7; k++) { const y = (k * 37 + Math.floor(t * 60) * 13) % 180; g.alpha(0.6); g.rect(0, y, 320, 2 + (k % 3), A.accent, true); g.alpha(1); }
+  const pop = Math.min(1, t * 3);
+  g.text(a.clock, 160, 18, { scale: 4, col: A.accent, align: 'center', shadow: '#000' });
+  g.text(`ACT ${a.k}`, 160, 44 + (1 - pop) * 6, { scale: 3, col: P.dim, align: 'center' });
+  g.text(A.name, 160, 60 + (1 - pop) * 10, { scale: 4, col: P.text, align: 'center', shadow: '#000' });
+  if (t > 0.5) drawVoice(g, A.line, 160, 92, t - 0.5, { col: A.accent });
+  if (t > 1.6) {
+    const label = a.rules.length ? 'TONIGHT I BREAK:' : 'NOTHING IS BROKEN. YET.';
+    g.text(label, 160, 112, { scale: 2, col: P.dim, align: 'center' });
+    if (a.rules.length) g.text(a.rules.join('  /  '), 160, 124, { scale: 2, col: P.warn, align: 'center' });
+  }
+  drawNightStrip(g, 40, 144, 240, st.match.playlist, st.match.eventIdx, st.match.winners, tierOf, GAMES);
+  if (t > 1.4) { g.rect(110, 160, 100, 14, P.ink, true); prompt(g, 'A', 'GO ON', 160, 163, { col: P.good, align: 'center' }); }
+}
+
+/** The night, laid out: every event, the rule it broke, who won it. The design of the night made visible. */
+function drawRecap() {
+  const t = st.t, m = st.match;
+  drawStage(g, 3, t, drift, { calm: settings.calm });
+  g.text('THE NIGHT', 160, 4, { scale: 3, col: P.text, align: 'center' });
+  g.text('2:00 AM  LAST CALL', 160, 17, { scale: 1, col: ACTS[3].accent, align: 'center' });
+  const rows = m.playlist.length;
+  const rowH = Math.min(15, 118 / rows);
+  m.playlist.forEach((id, i) => {
+    const show = t > 0.6 + i * RECAP_STEP;
+    if (!show) return;
+    const y = 28 + i * rowH;
+    const meta = GAMES[id].meta, k = tierOf(id), A = ACTS[k];
+    const slide = clamp((t - 0.6 - i * RECAP_STEP) * 6, 0, 1);
+    const x = 8 + (1 - slide) * 30;
+    g.alpha(slide);
+    g.rect(x, y, 3, rowH - 3, A.accent, true);
+    g.text(nightClock(i).replace(' PM', '').replace(' AM', ''), x + 7, y + 1, { scale: 2, col: P.dim, shadow: null });
+    g.text(meta.name, x + 44, y + 1, { scale: 2, col: meta.color, shadow: null });
+    g.text(meta.broken ? `BROKE ${meta.broken}` : 'RULES INTACT', x + 158, y + 1, { scale: 2, col: meta.broken ? A.accent : '#5a5280', shadow: null });
+    const w = m.winners[i];
+    if (w) { drawPlayer(g, w - 1, 296, y + rowH - 2, { size: 0.7 }); g.text(`P${w}`, 304, y + 1, { scale: 1, col: SEAT_COLORS[w - 1], shadow: null }); }
+    g.alpha(1);
+  });
+  const end = 0.6 + rows * RECAP_STEP;
+  if (t > end) {
+    const broke = new Set(m.playlist.map((id) => GAMES[id].meta.broken).filter(Boolean)).size;
+    drawVoice(g, `${rows} GAMES. ${broke} BROKEN RULES. SAME TIME TOMORROW?`, 160, 150, t - end, { col: ACTS[3].accent, speed: 40 });
+  }
+  if (t > end + 0.8) { g.rect(110, 165, 100, 13, P.ink, true); prompt(g, 'A', 'PODIUM', 160, 167, { col: P.good, align: 'center' }); }
 }
 
 function drawPause() {

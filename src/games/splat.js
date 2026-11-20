@@ -1,7 +1,7 @@
 // SPLAT CITY: top-down paint war. Bullets paint the streets as they fly and
 // splat where they land. Bounces = more paint. Most of the map wins.
 import { TAU, clamp, rand, approach, circleRect } from '../engine/util.js';
-import { drawPlayer, drawTag, SEAT_COLORS, SEAT_DARK } from '../engine/sprites.js';
+import { drawPlayer, drawTag, drawArm, SEAT_COLORS, SEAT_DARK } from '../engine/sprites.js';
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
@@ -9,6 +9,7 @@ import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js'
 export const meta = {
   id: 'splat', name: 'SPLAT CITY', color: '#ff9a2e', music: 'coins', tier: 1,
   tagline: 'A paint war in the streets',
+  card: { rule: 'PAINT THE MOST OF THE CITY', rule2: 'BULLETS PAINT. HITS SPLAT YOUR COLOUR', keys: [['X', 'SHOOT'], ['A', 'DASH'], ['RB', 'BLOCK']], danger: 'SWEEPERS, SPRINKLER, RAIN' },
   objective: 'Paint the most of the city. Bullets paint as they fly and splat where they land.',
   controls: [['STICK', 'Move and aim (your feet paint too)'], ['X / RT', 'Shoot paint'], ['A', 'Dash'], ['RB', 'Block']],
   hazards: 'Street sweepers / a spinning sprinkler / rain clouds that wash paint away',
@@ -76,7 +77,7 @@ export function create(ctx) {
       p.vx += info.dx * k; p.vy += info.dy * k; p.stun = 0.4; p.flashT = 0.12;
       if (info.g.frost) p.slowT = 1.5;
       if (info.owner) { paintAt(p.x, p.y, 10 + Math.min(10, info.dmg / 8), info.owner.idx); fx.burst(p.x, p.y, 14, SEAT_COLORS[info.owner.idx], { speed: 90, life: 0.4, size: 2 }); }
-      sound.sfx('hit'); fx.shake(0.1);
+      fx.impact(p.x, p.y, { dmg: info.dmg, col: SEAT_COLORS[p.idx], dx: info.dx, dy: info.dy }); sound.sfx('hit');
       return 'hit';
     },
     onPaint: (b, x, y, end) => {
@@ -196,11 +197,11 @@ export function create(ctx) {
       g.circle(160, 99, 4, '#33d6ff');
     }
     for (const c of clouds) {
-      if (c.warn > 0) { g.ring(c.x, c.y, c.r, Math.floor(t * 10) % 2 ? '#8fe8ff' : '#33d6ff'); g.text('!', c.x, c.y - 4, { scale: 2, col: '#8fe8ff', align: 'center', ui: false }); }
+      if (c.warn > 0) { g.ring(c.x, c.y, c.r, Math.floor(t * 5) % 2 ? '#8fe8ff' : '#33d6ff'); g.text('!', c.x, c.y - 4, { scale: 2, col: '#8fe8ff', align: 'center', ui: false }); }
       else { g.alpha(0.5); g.circle(c.x, c.y, c.r, '#8fe8ff'); g.alpha(1); }
     }
     for (const s of sweepers) {
-      if (s.warn > 0) { if (Math.floor(t * 10) % 2) g.text(s.horiz ? (s.v > 0 ? '>>' : '<<') : (s.v > 0 ? 'VV' : '^^'), clamp(s.x, 10, 310), clamp(s.y, TOP + 4, 170), { scale: 2, col: '#ffd84a', align: 'center', ui: false }); continue; }
+      if (s.warn > 0) { if (Math.floor(t * 5) % 2) g.text(s.horiz ? (s.v > 0 ? '>>' : '<<') : (s.v > 0 ? 'VV' : '^^'), clamp(s.x, 10, 310), clamp(s.y, TOP + 4, 170), { scale: 2, col: '#ffd84a', align: 'center', ui: false }); continue; }
       const w = s.horiz ? 18 : 12, h = s.horiz ? 12 : 18;
       g.rect(s.x - w / 2, s.y - h / 2, w, h, '#ffd84a'); g.rect(s.x - w / 2 + 2, s.y - h / 2 + 2, w - 4, h - 4, '#3a3000');
       g.rect(s.x - 1, s.y - 1, 3, 3, Math.floor(t * 8) % 2 ? '#ff5a3a' : '#ffd84a');
@@ -209,10 +210,10 @@ export function create(ctx) {
     guns.draw(g);
     for (const p of players) {
       g.circle(p.x, p.y - 1, p.r + 4, '#0b0a12'); g.ring(p.x, p.y - 1, p.r + 4, '#ffffff');
-      drawPlayer(g, p.idx, p.x, p.y + p.r, { flip: p.face < 0, size: p.st.size * 0.9, flash: p.flashT > 0 });
+      drawPlayer(g, p.idx, p.x, p.y + p.r, { flip: p.face < 0, size: p.st.size * 0.9, flash: p.flashT > 0, look: p.aim });
+      drawArm(g, p, p.x, p.y, p.st.size * 0.9);
       if (p.blockT > 0) g.ring(p.x, p.y, p.r + 4, '#5affd9');
       if (p.stun > 0) for (let k = 0; k < 3; k++) { const a = t * 8 + k * 2; g.rect(p.x + Math.cos(a) * 5, p.y - 10 + Math.sin(a) * 2, 1, 1, '#ffd84a'); }
-      g.rect(p.x + Math.cos(p.aim || 0) * 8 - 0.5, p.y + Math.sin(p.aim || 0) * 8 - 0.5, 1, 1, '#fff');
       drawTag(g, p.idx, p.x, p.y - 7 * p.st.size);
       drawBuffs(g, p, p.x, p.y + p.r + 2);
     }

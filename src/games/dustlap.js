@@ -9,6 +9,7 @@ import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js'
 export const meta = {
   id: 'dustlap', name: 'DUST LAP', color: '#ff9a2e', music: 'dustlap', tier: 1,
   tagline: 'A dusk desert sprint',
+  card: { rule: 'DRIVE THROUGH EVERY GATE', rule2: 'FIRST TO FINISH THE LAPS WINS', keys: [['A', 'HOLD: DRIFT'], ['X', 'BLAST'], ['RB', 'HOP']], danger: 'TUMBLEWEEDS, BOULDERS, DUST DEVILS' },
   objective: 'Drive through every gate. First to finish the laps wins.',
   controls: [['STICK', 'Steer (point where to go)'], ['A (HOLD)', 'Drift, release to boost'], ['X / RT', 'Blaster: hits spin rivals out'], ['RB', 'Hop over hazards and shots']],
   hazards: 'Tumbleweeds / rolling boulders / cactus / dust devils that spin you',
@@ -392,7 +393,7 @@ export function create(ctx) {
     }
     for (const b of boulders) {
       if (b.warn > 0) {
-        if (Math.floor(t * 10) % 2) {
+        if (Math.floor(t * 5) % 2) {
           const y = b.vy > 0 ? 18 : 170;
           g.text('!', b.x, y - 6, { scale: 3, col: '#ff3a3a', align: 'center', ui: false });
           g.dotted(b.x, 16, b.x, 178, '#ff3a3a88', 5);
@@ -415,7 +416,7 @@ export function create(ctx) {
       g.alpha(0.35); g.circle(c.x + 1, c.y + 2, c.r + 1, '#000'); g.alpha(1);
       if (c.boostT > 0) fx.burst(c.x - Math.cos(c.ang) * 7, c.y - Math.sin(c.ang) * 7, 1, Math.random() < 0.5 ? '#ffd84a' : '#ff7a2e', { speed: 40, life: 0.18, angle: c.ang + Math.PI, spread: 0.6 });
       const sc = c.st.size * (1 + lift * 0.04) * 0.85;
-      g.image(c.flashT > 0 ? a.carWhite : a.car, c.x, c.y - lift, { scale: sc, rot: c.ang, anchor: 'center', alpha: c.braceT > 0 && Math.floor(t * 16) % 2 ? 0.6 : 1 });
+      g.image(c.flashT > 0 ? a.carWhite : a.car, c.x, c.y - lift, { scale: sc, rot: c.ang, anchor: 'center', alpha: c.braceT > 0 && Math.floor(t * 5) % 2 ? 0.6 : 1 });
       if (c.braceT > 0) g.ring(c.x, c.y - lift, c.r + 3, '#5affd9');
       if (c.shields) g.ring(c.x, c.y - lift, c.r + 2, '#9fd3ff55');
       g.rect(c.x - 6, c.y - lift - 13, 12, 6, '#0b0a12');

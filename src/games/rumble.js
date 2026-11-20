@@ -12,6 +12,7 @@ import { Drift, P } from '../engine/style.js';
 export const meta = {
   id: 'rumble', name: 'RICOCHET ROOFTOP', color: '#33d6ff', music: 'rumble', tier: 1,
   tagline: 'A rooftop shootout with bouncing bullets',
+  opener: true,
   objective: 'Last one standing takes the round, if they landed a hit. First to 2 rounds wins.',
   card: { rule: 'LAST ONE STANDING TAKES THE ROUND', rule2: 'LAND A HIT TO COUNT. FIRST TO 2',  keys: [['A', 'JUMP'], ['X', 'SHOOT'], ['RB', 'BLOCK']], danger: 'SAWS, SEARCHLIGHT, RISING WATER' },
   controls: [['STICK', 'Move and aim'], ['A', 'Jump (double jump)'], ['X / RT', 'Shoot (bullets drop and bounce)'], ['RB', 'Block'], ['R-STICK', 'Aim freely']],
@@ -431,7 +432,7 @@ export function create(ctx) {
     }
     if (waterY < 182) { // electric water reads as danger: dark red body, bright crackle line
       g.alpha(0.7); g.rect(0, waterY, 320, 182 - waterY, '#3a0d1e'); g.alpha(1);
-      for (let x = 0; x < 320; x += 2) g.rect(x, waterY + Math.sin(x * 0.2 + t * 6) * 1.2, 2, 1, (x / 2 + Math.floor(t * 10)) % 7 ? P.danger : '#ffd0d0');
+      for (let x = 0; x < 320; x += 2) g.rect(x, waterY + Math.sin(x * 0.2 + t * 6) * 1.2, 2, 1, (x / 2 + Math.floor(t * 3)) % 7 ? P.danger : '#ffd0d0');
     }
     for (const p of players) {
       if (!p.dead || p.perma || game.finished || between > 0) continue;

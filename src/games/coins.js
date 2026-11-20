@@ -1,6 +1,6 @@
 // COIN STORM: side-view coin grab on a city block at night.
 import { TAU, clamp, rand, overlap, circleRect } from '../engine/util.js';
-import { drawPlayer, drawTag, SEAT_COLORS } from '../engine/sprites.js';
+import { drawPlayer, drawTag, drawArm, SEAT_COLORS } from '../engine/sprites.js';
 import { makeBody, platformControl, stepBody, moveMovers } from './platformer.js';
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
@@ -85,7 +85,7 @@ export function create(ctx) {
     p.coins -= n; p.inv = 0.8; p.flashT = 0.12;
     for (let k = 0; k < n; k++) dropCoin(p.b.x + p.b.w / 2, p.b.y, 1, true);
     if (n) fx.popup(`-${n}`, p.b.x + p.b.w / 2, p.b.y - 10, '#ff5a5a', 2);
-    sound.sfx('hit'); fx.shake(0.15);
+    fx.impact(p.b.x + p.b.w / 2, p.b.y + p.b.h / 2, { dmg: 10 + n * 6, col: SEAT_COLORS[p.idx] }); sound.sfx(n >= 3 ? 'hitBig' : 'hit');
     return true;
   }
   function knock(p, kx, ky) {
@@ -252,8 +252,9 @@ export function create(ctx) {
   Object.defineProperty(game, 'timeLeft', { get: () => Math.max(0, TIME - t) });
 
   game.draw = (g) => {
-    g.rect(0, 0, 320, 180, '#0e0a24', true);
-    g.rect(0, 100, 320, 80, '#160f34', true);
+    const D = (c) => (ctx.drift ? ctx.drift.col(c, 'bg') : c);
+    g.rect(0, 0, 320, 180, D('#0e0a24'), true);
+    g.rect(0, 100, 320, 80, D('#160f34'), true);
     for (let k = 0; k < 14; k++) {
       const x = k * 24, h = 40 + ((k * 37) % 50);
       g.rect(x, 168 - h, 20, h, '#1f1846', true);
@@ -264,7 +265,7 @@ export function create(ctx) {
     // bolts
     for (const bo of bolts) {
       if (bo.warn > 0) {
-        if (Math.floor(t * 14) % 2) { g.alpha(0.25); g.rect(bo.x - bo.w / 2, 14, bo.w, 154, '#e8f0ff'); g.alpha(1); }
+        if (Math.floor(t * 5) % 2) { g.alpha(0.25); g.rect(bo.x - bo.w / 2, 14, bo.w, 154, '#e8f0ff'); g.alpha(1); }
         g.text('!', bo.x, 18, { scale: 3, col: '#e8f0ff', align: 'center', ui: false });
       } else {
         let x = bo.x;
@@ -284,14 +285,14 @@ export function create(ctx) {
     for (let k = 0; k < 8; k++) { const a = k * TAU / 8; g.rect(bx + Math.cos(a) * (pend.r + 1) - 1, by + Math.sin(a) * (pend.r + 1) - 1, 2, 2, '#ddd'); }
     // coins
     for (const c of coins) {
-      if (c.life < 2 && Math.floor(t * 10) % 2) continue;
+      if (c.life < 2 && Math.floor(t * 5) % 2) continue;
       const wv = Math.abs(Math.cos(c.rot)) * c.r + 0.6;
       g.rect(c.x - wv, c.y - c.r, wv * 2, c.r * 2, c.value > 1 ? '#fff2a0' : '#ffd84a');
       g.rect(c.x - wv * 0.4, c.y - c.r + 1, Math.max(1, wv * 0.8), c.r * 2 - 2, c.value > 1 ? '#ffd84a' : '#c99a1a');
     }
     // barrels
     for (const br of barrels) {
-      if (br.warn > 0) { if (Math.floor(t * 12) % 2) g.text(br.fromLeft ? '>>' : '<<', br.fromLeft ? 10 : 300, 150, { scale: 2, col: '#ff5a5a', align: 'center', ui: false }); continue; }
+      if (br.warn > 0) { if (Math.floor(t * 5) % 2) g.text(br.fromLeft ? '>>' : '<<', br.fromLeft ? 10 : 300, 150, { scale: 2, col: '#ff5a5a', align: 'center', ui: false }); continue; }
       g.circle(br.x, br.y, br.r, '#8a5a2a');
       g.rect(br.x - br.r, br.y - 1, br.r * 2, 2, '#5a3a1a');
       g.rect(br.x + Math.cos(br.rot) * 4 - 1, br.y + Math.sin(br.rot) * 4 - 1, 2, 2, '#c08a4a');
@@ -301,8 +302,9 @@ export function create(ctx) {
     // players
     for (const p of players) {
       const cx = p.b.x + p.b.w / 2;
-      const blink = p.inv > 0 && Math.floor(t * 16) % 2;
-      drawPlayer(g, p.idx, cx, p.b.y + p.b.h, { flip: p.face < 0, size: p.st.size, flash: p.flashT > 0, alpha: blink ? 0.5 : 1, squash: p.b.squash });
+      const blink = p.inv > 0 && Math.floor(t * 5) % 2;
+      drawPlayer(g, p.idx, cx, p.b.y + p.b.h, { flip: p.face < 0, size: p.st.size, flash: p.flashT > 0, alpha: blink ? 0.5 : 1, squash: p.b.squash, look: p.aim });
+      drawArm(g, p, cx, p.b.y + p.b.h / 2 - 1, p.st.size);
       drawBuffs(g, p, cx, p.b.y - 24);
       if (p.blockT > 0) g.ring(cx, p.b.y + p.b.h / 2, 10 * p.st.size, '#9ff');
       if (p.stunT > 0) for (let k = 0; k < 3; k++) { const a = t * 8 + k * 2; g.rect(cx + Math.cos(a) * 5, p.b.y - 4 + Math.sin(a) * 2, 1, 1, '#ffd84a'); }

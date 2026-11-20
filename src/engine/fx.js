@@ -57,7 +57,8 @@ export class Fx {
    * small white ring marks the contact point. Games add their own sound.
    */
   impact(x, y, { dmg = 20, col = '#fff', dx = 0, dy = 0 } = {}) {
-    this.stop(Math.min(0.1, 0.035 + dmg / 500));
+    // the freeze has a cooldown, so a storm of stacked-power hits can't stall the game (≤ ~30% of the time)
+    if (this.hitstop <= 0 && this.t >= (this.stopReady ?? -9)) { const d = Math.min(0.1, 0.035 + dmg / 500); this.stop(d); this.stopReady = this.t + d + 0.25; }
     this.shake(0.12 + Math.min(0.3, dmg / 200));
     const a = dx || dy ? Math.atan2(dy, dx) : -Math.PI / 2;
     this.burst(x, y, 6, '#ffffff', { speed: 150, life: 0.22, angle: a, spread: 1.1, drag: 4 });

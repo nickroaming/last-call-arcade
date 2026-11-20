@@ -26,6 +26,7 @@ export class Guns {
   /** Per frame, per shooter. Returns true when a shot fired. */
   trigger(owner, gs, g, held, ang, x, y, dt) {
     gs.cd -= dt; gs.since += dt;
+    if (owner && typeof owner === 'object') owner.aim = ang; // the arm follows the aim in every event
     if (gs.reloadT > 0) {
       gs.reloadT -= dt;
       if (gs.reloadT <= 0) gs.ammo = g.ammo;
@@ -36,6 +37,7 @@ export class Guns {
     }
     if (held && gs.cd <= 0 && gs.ammo > 0 && gs.reloadT <= 0) {
       this.spawn(owner, x, y, ang, g);
+      if (owner && typeof owner === 'object') owner.recoilAt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
       gs.burstLeft = g.burst - 1; gs.burstT = 0.07;
       gs.ammo -= 1; gs.cd = g.delay; gs.since = 0;
       if (gs.ammo <= 0) gs.reloadT = g.reload;

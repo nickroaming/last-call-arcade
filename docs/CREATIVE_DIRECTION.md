@@ -115,10 +115,39 @@ Chiptune themes per game family. The SFX vocabulary stays consistent everywhere:
 ## 9. Status
 | Area | Built | Next |
 | --- | --- | --- |
-| Three acts (tiered playlist) | ✔ | Act banner on the intro card |
+| Three acts (tiered playlist) | ✔ act break screens, night clock, night strip, recap | Real couch test: does the recap land? |
 | Six pillars applied to the new games | ✔ Wormhole, Rule Breaker, Still Life | Retrofit a clear "turn" into every act 1 game |
-| Smooth animated characters | ✔ shape identity, eyes, blink, walk, lean, squash | Gun arms pointing at the aim |
+| Smooth animated characters | ✔ shape identity, eyes, blink, walk, lean, squash, gun arms in every event | — |
 | UI system | Mostly in place | Audit every screen against the type scale and safe margin |
 | Real-world test | Not yet | Xbox couch session: can everyone say each game's rule after one play? |
+
+---
+
+## 10. The night as one designed arc (build `m1-2026-11-20.10-night`)
+**The problem:** the pitch above was true in the code (tiers, act order) but invisible on screen. Players saw "EVENT 4 OF 8" and a list of unrelated minigames. The Cabinet never spoke.
+
+**The aha we're designing for:** at 2:00 AM the recap lays out the whole night, and you see that it was built. Three warm-up games with the rules intact, then gravity, light, up and down, space, and finally the rules themselves. The night was one story about a machine waking up, and you played it.
+
+**How each screen carries the thread:**
+| Moment | What the player sees | Why |
+| --- | --- | --- |
+| Title | The Cabinet stands centre stage. Its screen types "THE BAR IS CLOSED. I AM NOT." | The premise in seven words, before anyone presses a button |
+| Act break (new) | Clock, "ACT 2 / THE MACHINE WAKES", the Cabinet's line, and "TONIGHT I BREAK: GRAVITY / LIGHT" | Sets up a promise the night then keeps, event by event |
+| Intro card | The night clock (11:00 PM to 1:40 AM) and the night strip: one slot per event, coloured by act, winners filled in. Act 2 and 3 cards say "THE CABINET BREAKS: GRAVITY" | You always know where you are in the arc |
+| Results | One deadpan line from the Cabinet about what just happened ("P2 AGAIN? I'M MAKING IT HARDER.") | The house has a voice and notices you |
+| Draft | Last place gets a 4th card | The comeback promise is now real |
+| Recap (new) | THE NIGHT: every event, its time, the rule it broke, who won. "8 GAMES. 5 BROKEN RULES. SAME TIME TOMORROW?" | The payoff: the structure, made visible |
+
+**Running order:** every night opens with **Ricochet Rooftop** (`meta.opener`, it teaches the gun everyone uses) and ends with **Rule Breaker** (`meta.finale`): the last thing the Cabinet breaks is its own rulebook. Acts run 11 PM (warm-up), midnight (the machine wakes), 1 AM (last call).
+
+**One look:** every menu is drawn on the same stage (`drawStage` in `src/game/night.js`). Its colours shift with the act: warm amber, then cold cyan, then hot magenta. It has scanlines and the rounded glass of a CRT. Play keeps the bezel only. Everything you see is the Cabinet's screen.
+
+**The Cabinet's voice rules:**
+- one line at a time
+- typed out with a soft blip
+- at most about 40 characters
+- deadpan, never a joke at a player's expense beyond the game
+
+The icon is the faceless Cabinet.
 
 **Sources:** [Portal post-mortem (GDC 2008)](https://cdn.fastly.steamstatic.com/apps/valve/2008/GDC2008_PortalPostMortem.pdf) · [Kim Swift on design lessons](https://gamedeveloper.com/design/10-years-of-design-lessons-from-em-portal-em-s-kim-swift) · [Portal developer commentary](https://theportalwiki.com/wiki/Portal_developer_commentary) · [Designing Baba Is You's rule system](https://www.gamedeveloper.com/design/designing-i-baba-is-you-i-s-delightfully-innovative-rule-writing-system) · [Baba Is You (Wikipedia)](https://en.wikipedia.org/wiki/Baba_Is_You) · [Superhot's origin](https://www.gamedeveloper.com/disciplines/the-origin-and-future-of-frozen-time-fps-hit-superhot-and-the-positive-crunching-behind-it)

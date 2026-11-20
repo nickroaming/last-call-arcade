@@ -115,6 +115,12 @@ export class Sound {
       case 'lock': this.tone({ f: 110, f2: 70, type: 'square', dur: 0.1, vol: 0.22 }); this.tone({ f: 1760, dur: 0.05, vol: 0.12, at: t + 0.04 }); break;
       // a seat is ready
       case 'ready': this.tone({ f: 784, dur: 0.06, vol: 0.13 }); this.tone({ f: 1047, dur: 0.1, vol: 0.13, at: t + 0.06 }); break;
+      // the Cabinet types: a soft blip
+      case 'type': this.tone({ f: 1400 + Math.random() * 300, dur: 0.02, vol: 0.035, type: 'square' }); break;
+      // an act begins: a low swell, a falling minor arpeggio, a hiss
+      case 'act': this.tone({ f: 55, f2: 110, type: 'sawtooth', dur: 1.1, vol: 0.18, attack: 0.3 }); [12, 8, 5, 0].forEach((n, i) => this.tone({ f: midi(57 + n), dur: 0.22, vol: 0.13, at: t + 0.35 + i * 0.16, type: 'square' })); this.noise({ dur: 0.9, vol: 0.08, hp: 4000, at: t + 0.1 }); break;
+      // a line of the night recap lands
+      case 'tick': this.tone({ f: 660, dur: 0.05, vol: 0.1, type: 'triangle' }); this.tone({ f: 990, dur: 0.06, vol: 0.08, at: t + 0.04 }); break;
       case 'lose': [7, 5, 3, 0].forEach((n, i) => this.tone({ f: midi(60 + n), dur: 0.2, vol: 0.12, at: t + i * 0.15, type: 'triangle' })); break;
       default: break;
     }

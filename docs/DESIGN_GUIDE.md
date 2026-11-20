@@ -1,6 +1,6 @@
 # Design guide
 
-**Build:** `m1-2026-11-20.9-core` (branch `quality/core-pass`), extending `m1-2026-11-20.8-polish` · **Date:** 2026-11-20
+**Build:** `m1-2026-11-20.10-night` (branch `quality/facelift`), extending `.9-core` and `.8-polish` · **Date:** 2026-11-20
 **Code:** shared decisions live in [`src/engine/style.js`](../src/engine/style.js). If you need a colour, text size, button prompt or drift, take it from there instead of hard-coding it.
 
 ## 1. Direction: Study A, "calm"
@@ -152,7 +152,26 @@ One vocabulary for hits, so every event lands the same way:
 - **Prompts follow the device:** the keyboard hint only appears when no controller is connected.
 - **Player count:** ready strip, draft columns, HUD and round pips lay out from the number of players (2 or 3).
 
-## 10. Extending to other events
+## 10. The night layer (`src/game/night.js`)
+The story frame is a design system too:
+
+| Piece | Rule |
+| --- | --- |
+| Stage (`drawStage(g, act, t, drift)`) | Every menu: act 0 title/podium (violet + pink), act 1 amber, act 2 cyan, act 3 magenta. Base and bands drift like any backdrop. Two neon tubes in the act accent. Act 3 slips a thin accent slice every ~4 s (not in Calm Mode). |
+| CRT (`drawCrt`, `drawBezel`) | Scanlines at 9% on menus; the rounded bezel on every screen, play included. Never over text that matters more than the frame. |
+| The Cabinet's voice (`drawVoice`) | Its icon plus one line, typed at 32 characters per second with a `type` blip every other character. Max ~40 characters, scale 2, in the act accent or warn yellow. One voice line on screen at a time. |
+| Night strip (`drawNightStrip`) | One slot per event; act accent border; finished slots show the winner's colour; the current slot is framed in white; a thin divider between acts. |
+| Clock (`clockAt`) | 11 PM, midnight and 1 AM start acts 1, 2 and 3; events inside an act share its hour; the recap is 2:00 AM. |
+| Broken rule (`meta.broken`) | Every act 2 and 3 event names one rule in 1–3 words (GRAVITY, LIGHT, YOUR BODY, TIME, UP AND DOWN, THE PAST, SPACE, THE RULES). Act 1 events have none, on purpose: the rules are intact. |
+
+**Component states:**
+| Component | Base | Focus | Selected / locked | Disabled / waiting | Won | Lost / out | Disconnected |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Night strip slot | dark, act border | current: act fill + white frame | — | future: dark | winner colour bar | — | — |
+| Act screen | glitch in (0.6 s), then still | — | `[A] GO ON` after 1.4 s | auto after 6 s | — | — | game pauses |
+| Recap row | slides in, one every 0.32 s with a `tick` | — | — | — | winner character + P-label | "RULES INTACT" in dim purple | — |
+
+## 11. Extending to other events
 1. Give the event a `meta.card` (`rule`, `rule2`, `keys`, `danger`). The intro switches to the short layout automatically.
 2. Draw backdrop colours through `drift.col(c, 'bg')` and platform fills through `'geo'`. Keep edges, players, hazards and UI on fixed colours.
 3. Use `P.danger` for anything that hurts, and nowhere else.
@@ -160,3 +179,4 @@ One vocabulary for hits, so every event lands the same way:
 5. Every hazard gets ≥ 1 s of steady warning and a sound.
 6. Hits go through `fx.impact`, knockouts through `fx.ko`, and anything with a gun draws `drawGun`.
 7. Run `/tests/measure.html`. The event joins the core set when it averages ≥ 20 s and an idle player wins ≤ 15%.
+8. If it is act 2 or 3, give it `meta.broken`: the one rule it breaks, in 1–3 words. That line is how the event joins the night's story.

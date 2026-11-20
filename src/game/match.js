@@ -9,9 +9,9 @@ export const POINTS = [3, 2, 1];
  * A playlist of `total` events: every game once (as far as `total` allows),
  * then repeats, at most `perGame` of each, never the same game twice in a row.
  */
-export function makePlaylist(ids, perGame = 2, rng = Math.random, total = null, tierOf = null) {
+export function makePlaylist(ids, perGame = 2, rng = Math.random, total = null, tierOf = null, roleOf = null) {
   total = total || ids.length * perGame;
-  if (tierOf && total <= ids.length) return actPlaylist(ids, rng, total, tierOf);
+  if (tierOf && total <= ids.length) return actPlaylist(ids, rng, total, tierOf, roleOf);
   const ok = (p) => p.every((g, i) => i === 0 || g !== p[i - 1]);
   for (let tries = 0; tries < 400; tries++) {
     const first = shuffle(ids, rng).slice(0, Math.min(total, ids.length));
@@ -29,7 +29,7 @@ export function makePlaylist(ids, perGame = 2, rng = Math.random, total = null, 
  * the rest mind-bending (tier 3). Which games appear is random; the order of
  * the acts is not. Falls back to other tiers when one runs short.
  */
-export function actPlaylist(ids, rng, total, tierOf) {
+export function actPlaylist(ids, rng, total, tierOf, roleOf = null) {
   const pools = [1, 2, 3].map((k) => shuffle(ids.filter((id) => (tierOf(id) || 1) === k), rng));
   const want = [Math.round(total * 0.4), Math.round(total * 0.25)];
   want.push(total - want[0] - want[1]);
@@ -37,13 +37,16 @@ export function actPlaylist(ids, rng, total, tierOf) {
   for (let k = 0; k < 3; k++) for (let i = 0; i < want[k] && pools[k].length; i++) out.push({ id: pools[k].shift(), k });
   const rest = shuffle(pools.flat(), rng); // short tier: borrow from the others
   while (out.length < total && rest.length) { const id = rest.shift(); out.push({ id, k: tierOf(id) || 1 }); }
-  out.sort((a, b) => a.k - b.k);
+  // acts in order; inside an act, an event marked opener goes first and a finale goes last
+  const w = (o) => o.k * 10 + (roleOf && roleOf(o.id) === 'opener' ? 0 : roleOf && roleOf(o.id) === 'finale' ? 9 : 5);
+  out.sort((a, b) => w(a) - w(b));
   return out.map((o) => o.id);
 }
 
 export class Match {
-  constructor(seats, gameIds, { perGame = 2, rng = Math.random, total = null, tierOf = null } = {}) {
+  constructor(seats, gameIds, { perGame = 2, rng = Math.random, total = null, tierOf = null, roleOf = null } = {}) {
     this.tierOf = tierOf;
+    this.roleOf = roleOf;
     this.seats = seats.slice();
     this.gameIds = gameIds;
     this.perGame = perGame;
@@ -53,7 +56,8 @@ export class Match {
   }
   reset() {
     this.players = this.seats.map((seat) => ({ seat, points: 0, wins: 0, powers: {}, places: [], tipsy: 0 }));
-    this.playlist = makePlaylist(this.gameIds, this.perGame, this.rng, this.total, this.tierOf);
+    this.playlist = makePlaylist(this.gameIds, this.perGame, this.rng, this.total, this.tierOf, this.roleOf);
+    this.winners = [];
     this.eventIdx = 0;
     this.suddenDeath = null;
   }
@@ -77,6 +81,7 @@ export class Match {
       return { seat, place: i + 1, pts, tipsy: p.tipsy };
     });
     this.lastRanking = ranking.slice();
+    this.winners[this.eventIdx] = ranking[0];
     return out;
   }
 

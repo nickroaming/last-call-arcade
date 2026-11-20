@@ -13,6 +13,7 @@ import { makeRounds } from '../game/rounds.js';
 export const meta = {
   id: 'mobius', name: 'MOBIUS LOOP', color: '#c86bff', music: 'rumble', tier: 3,
   tagline: 'Two floors. Gravity picks the closer one.',
+  broken: 'UP AND DOWN', // the rule the Cabinet breaks in this event
   objective: 'Last one standing takes the round, if they landed a hit. First to 2. Double jump past the horizon to fall UP.',
   card: { rule: 'DOUBLE JUMP PAST THE MIDDLE: FALL UP', rule2: 'LAST STANDING + A HIT = ROUND. FIRST TO 2', keys: [['A', 'JUMP X2'], ['X', 'SHOOT'], ['RB', 'BLOCK']], danger: 'HORIZON SAWS, SPIKES, SIDE EDGES FLIP' },
   controls: [['STICK', 'Move and aim'], ['A', 'Jump (x2 = fall up)'], ['X / RT', 'Shoot (bullets curve)'], ['RB', 'Block'], ['R-STICK', 'Aim freely']],

@@ -1,7 +1,7 @@
 // UPDRAFT: the screen climbs and a laser floor chases you. Hop up the ledges,
 // shoot rivals off them. The sky changes colour as you climb.
 import { clamp, rand, overlap } from '../engine/util.js';
-import { drawPlayer, drawTag, SEAT_COLORS } from '../engine/sprites.js';
+import { drawPlayer, drawTag, drawArm, SEAT_COLORS } from '../engine/sprites.js';
 import { makeBody, platformControl, stepBody } from './platformer.js';
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
@@ -10,6 +10,7 @@ import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js'
 export const meta = {
   id: 'updraft', name: 'UPDRAFT', color: '#5affd9', music: 'dustlap', tier: 1,
   tagline: 'Climb or get zapped',
+  card: { rule: 'CLIMB. THE LASER FLOOR FOLLOWS', rule2: 'LAST ONE ABOVE IT WINS', keys: [['A', 'JUMP'], ['X', 'SHOOT'], ['RB', 'BLOCK']], danger: 'LASER FLOOR, ICICLES, CRUMBLE' },
   objective: 'The screen keeps climbing and the laser floor follows. Last one above it wins. Shoot rivals off their ledges.',
   controls: [['STICK', 'Move and aim'], ['A', 'Jump (double jump)'], ['X / RT', 'Shoot (knockback)'], ['RB', 'Block'], ['DOWN + A', 'Drop through a ledge']],
   hazards: 'Laser floor / crumbling ledges / springs / falling icicles / side gusts',
@@ -85,7 +86,7 @@ export function create(ctx) {
       const k = 170 * (info.g.knock || 1) * Math.sqrt(Math.max(0.4, info.dmg / 34)) * p.st.knockTaken;
       p.b.vx += info.dx * k; p.b.vy += info.dy * k * 0.5 - 40; p.b.stun = 0.25; p.flashT = 0.1;
       if (info.g.frost) p.slowT = 1.5;
-      sound.sfx('hit'); fx.burst(p.b.x + p.b.w / 2, p.b.y + p.b.h / 2, 6, SEAT_COLORS[p.idx], { speed: 70, life: 0.3 });
+      fx.impact(p.b.x + p.b.w / 2, p.b.y + p.b.h / 2, { dmg: info.dmg, col: SEAT_COLORS[p.idx], dx: info.dx, dy: info.dy }); sound.sfx('hit');
       return 'hit';
     },
   }, fx, sound);
@@ -94,7 +95,7 @@ export function create(ctx) {
   game.update = (dt, controls) => {
     t += dt;
     env = { ...twistEnv(tw, t), ice: tw && tw.ice };
-    const speed = t < 2.5 ? 0 : Math.min(26, 7 + (t - 2.5) * 0.5);
+    const speed = t < 4 ? 0 : Math.min(24, 5 + (t - 4) * 0.4); // a 4 s teach beat, then a gentler climb (was over in ~7 s)
     if (t >= 2.5 && t - dt < 2.5) { fx.popup('GET CLIMBING!', 160, 60, '#5affd9', 3); sound.sfx('go'); }
     const dy = speed * dt;
     climbed += dy;
@@ -198,7 +199,7 @@ export function create(ctx) {
       if (q.kind === 'crumble') g.rect(q.x + q.w / 2 + sx, q.y, 1, q.h, '#3a2a20');
     }
     for (const ic of icicles) {
-      if (ic.warn > 0) { if (Math.floor(t * 12) % 2) { g.text('!', ic.x, 16, { scale: 2, col: '#bff3ff', align: 'center', ui: false }); g.dotted(ic.x, 24, ic.x, FLOOR, '#bff3ff44', 6); } continue; }
+      if (ic.warn > 0) { if (Math.floor(t * 5) % 2) { g.text('!', ic.x, 16, { scale: 2, col: '#bff3ff', align: 'center', ui: false }); g.dotted(ic.x, 24, ic.x, FLOOR, '#bff3ff44', 6); } continue; }
       g.rect(ic.x - 2, ic.y - 8, 4, 4, '#bff3ff'); g.rect(ic.x - 1, ic.y - 4, 2, 4, '#ffffff');
     }
     if (gust) {
@@ -210,7 +211,8 @@ export function create(ctx) {
     for (const p of players) {
       if (p.dead) continue;
       const cx = p.b.x + p.b.w / 2;
-      drawPlayer(g, p.idx, cx, p.b.y + p.b.h, { flip: p.face < 0, size: p.st.size, flash: p.flashT > 0, squash: p.b.squash });
+      drawPlayer(g, p.idx, cx, p.b.y + p.b.h, { flip: p.face < 0, size: p.st.size, flash: p.flashT > 0, squash: p.b.squash, look: p.aim });
+      drawArm(g, p, cx, p.b.y + p.b.h / 2 - 1, p.st.size);
       if (p.blockT > 0) g.ring(cx, p.b.y + p.b.h / 2, 10 * p.st.size, '#5affd9');
       if (p.shields) g.ring(cx, p.b.y + p.b.h / 2, 8 * p.st.size, '#9fd3ff55');
       drawTag(g, p.idx, cx, Math.max(22, p.b.y - 2));

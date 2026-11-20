@@ -4,7 +4,7 @@
 // Pillars differ on each side, so walls knock the twins out of sync. Collect
 // gems with either body; both bodies can be shot.
 import { TAU, clamp, rand, approach } from '../engine/util.js';
-import { drawPlayer, drawTag, SEAT_COLORS } from '../engine/sprites.js';
+import { drawPlayer, drawTag, drawGun, SEAT_COLORS } from '../engine/sprites.js';
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
@@ -12,6 +12,7 @@ import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js'
 export const meta = {
   id: 'mirror', name: 'MIRROR TWINS', color: '#9fd3ff', music: 'coins', tier: 2,
   tagline: 'One stick, two bodies, one lying mirror',
+  broken: 'YOUR BODY', // the rule the Cabinet breaks in this event
   card: { rule: 'MOST GEMS WINS', rule2: 'ONE STICK MOVES YOU AND YOUR TWIN', keys: [['X', 'BOTH SHOOT'], ['A', 'DASH'], ['RB', 'BLOCK']], danger: 'THE MIRROR RULE CHANGES' },
   objective: 'Most gems wins. One stick moves you AND your twin on the other side of the mirror.',
   controls: [['STICK', 'Move both (mirror rule)'], ['X / RT', 'Both shoot'], ['A', 'Both dash'], ['RB', 'Both block']],
@@ -92,8 +93,7 @@ export function create(ctx) {
     body.vx += dx * 150 * p.st.knockTaken; body.vy += dy * 150 * p.st.knockTaken;
     if (from && from !== p && from.hits !== undefined) from.hits += 1;
     drop(p, n, body);
-    fx.shake(0.2); fx.stop(0.03); sound.sfx('hit');
-    fx.burst(body.x, body.y, 10, SEAT_COLORS[p.idx], { speed: 90, life: 0.4 });
+    fx.impact(body.x, body.y, { dmg: 20, col: SEAT_COLORS[p.idx], dx, dy }); sound.sfx('hit');
     return 'hit';
   }
 
@@ -238,8 +238,9 @@ export function create(ctx) {
   Object.defineProperty(game, 'timeLeft', { get: () => Math.max(0, TIME - t) });
 
   game.draw = (g) => {
-    g.rect(0, 0, MX, 180, '#121a2e', true);
-    g.rect(MX, 0, 160, 180, '#1a122e', true);
+    const D = (c) => (ctx.drift ? ctx.drift.col(c, 'bg') : c);
+    g.rect(0, 0, MX, 180, D('#121a2e'), true);
+    g.rect(MX, 0, 160, 180, D('#1a122e'), true);
     for (let y = TOP; y < BOT; y += 12) for (let x = 0; x < 320; x += 12) if (((x + y) / 12) % 2) g.rect(x, y, 12, 12, x < MX ? '#152040' : '#201540', true);
     // the mirror
     for (let y = TOP; y < BOT; y += 2) g.rect(MX - HALF, y, HALF * 2, 2, Math.floor(y / 2 + t * 30) % 8 < 2 ? '#ffffff' : '#9fd3ff');
@@ -256,7 +257,7 @@ export function create(ctx) {
     }
     for (const side of ['L', 'R']) {
       const l = lasers[side];
-      if (l.warn > 0 && Math.floor(t * 12) % 2) {
+      if (l.warn > 0 && Math.floor(t * 5) % 2) {
         if (side === 'L') g.dotted(4, TOP, 4, BOT, '#ff5a5a', 3); else g.dotted(MX + 4, TOP + 4, 316, TOP + 4, '#ff5a5a', 3);
       }
       if (l.on) {
@@ -272,7 +273,7 @@ export function create(ctx) {
     pickups.draw(g);
     guns.draw(g);
     for (const p of players) {
-      const blink = p.invT > 0 && Math.floor(t * 16) % 2;
+      const blink = p.invT > 0 && Math.floor(t * 5) % 2;
       for (const b of [p.A, p.B]) {
         const twin = b === p.B;
         const al = p.ghost ? 0.3 : blink ? 0.4 : twin ? 0.85 : 1;
@@ -280,7 +281,7 @@ export function create(ctx) {
         drawPlayer(g, p.idx, b.x, b.y + b.r, { flip: (twin ? p.face * mode.sx : p.face) < 0, size: p.st.size * 0.9, flash: p.flashT > 0, alpha: al });
         if (p.blockT > 0) g.ring(b.x, b.y, b.r + 4, '#5affd9');
         const a = twin ? Math.atan2(Math.sin(p.aim) * mode.sy, Math.cos(p.aim) * mode.sx) : p.aim;
-        g.rect(b.x + Math.cos(a) * 9 - 0.5, b.y + Math.sin(a) * 9 - 0.5, 1, 1, '#fff');
+        drawGun(g, p.idx, b.x, b.y, a, { size: p.st.size * 0.9, alpha: al });
         if (!p.ghost) drawTag(g, p.idx, b.x, b.y - 12 * p.st.size);
       }
       // a faint thread between twins, so you can find your other half

@@ -1,7 +1,7 @@
 // TICK TOCK: hot potato with a live bomb you can THROW. A thrown bomb sticks
 // to whoever it hits; if it rolls loose, whoever touched it last owns it.
 import { TAU, clamp, rand, approach } from '../engine/util.js';
-import { drawPlayer, drawTag, SEAT_COLORS } from '../engine/sprites.js';
+import { drawPlayer, drawTag, drawArm, SEAT_COLORS } from '../engine/sprites.js';
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
@@ -92,7 +92,7 @@ export function create(ctx) {
       if (p.blockT > 0) { if (p.st.reflect && info.kind === 'bullet') return 'reflect'; sound.sfx('block'); return 'blocked'; }
       p.vx += info.dx * k * p.st.knockTaken; p.vy += info.dy * k * p.st.knockTaken; p.stun = 0.22; p.flashT = 0.1;
       if (info.g.frost) p.slowT = 1.5;
-      sound.sfx('hit');
+      fx.impact(p.x, p.y, { dmg: 20, col: SEAT_COLORS[p.idx], dx: info.dx, dy: info.dy }); sound.sfx('hit');
       return 'hit';
     },
   }, fx, sound);
@@ -229,9 +229,11 @@ export function create(ctx) {
   Object.defineProperty(game, 'timeLeft', { get: () => Math.max(0, TIME - t) });
 
   game.draw = (g) => {
-    g.rect(0, 0, 320, 180, '#0d1a1e', true);
-    for (let y = TOP; y < BOT; y += 16) for (let x = 0; x < 320; x += 16) if (((x + y) / 16) % 2) g.rect(x, y, 16, 16, '#112428', true);
-    for (const r of ICE) { g.rect(r.x, r.y, r.w, r.h, '#7fd8ff55'); g.frame(r.x, r.y, r.w, r.h, '#bff3ff'); if (Math.random() < 0.2) g.rect(r.x + rand(0, r.w), r.y + rand(0, r.h), 1, 1, '#fff'); }
+    const D = (c) => (ctx.drift ? ctx.drift.col(c, 'bg') : c);
+    g.rect(0, 0, 320, 180, D('#0d1a1e'), true);
+    const tile = D('#112428');
+    for (let y = TOP; y < BOT; y += 16) for (let x = 0; x < 320; x += 16) if (((x + y) / 16) % 2) g.rect(x, y, 16, 16, tile, true);
+    for (const r of ICE) { g.rect(r.x, r.y, r.w, r.h, '#7fd8ff55'); g.frame(r.x, r.y, r.w, r.h, '#bff3ff'); }
     for (const b of BELTS) {
       g.rect(b.x, b.y, b.w, b.h, '#2a2a3a'); g.frame(b.x, b.y, b.w, b.h, '#ffd84a');
       for (let k = 0; k < b.w; k += 10) { const x = b.x + ((k + t * 40 * b.dir) % b.w + b.w) % b.w; g.text(b.dir > 0 ? '>' : '<', x, b.y + 3.5, { scale: 2, col: '#ffd84a', ui: false, shadow: null }); }
@@ -244,9 +246,9 @@ export function create(ctx) {
       const hold = bomb.holder === p;
       if (hold) { g.ring(p.x, p.y, p.r + 5 + Math.sin(t * 20) * 1.5, '#ff3a1a'); }
       g.alpha(0.3); g.rect(p.x - 4, p.y + p.r - 1, 8, 2, '#000'); g.alpha(1);
-      drawPlayer(g, p.idx, p.x, p.y + p.r, { flip: p.face < 0, size: p.st.size * 0.9, flash: p.flashT > 0 });
+      drawPlayer(g, p.idx, p.x, p.y + p.r, { flip: p.face < 0, size: p.st.size * 0.9, flash: p.flashT > 0, look: p.aim });
+      drawArm(g, p, p.x, p.y, p.st.size * 0.9);
       if (p.blockT > 0) g.ring(p.x, p.y, p.r + 4, '#5affd9');
-      g.rect(p.x + Math.cos(p.aim || 0) * 8 - 0.5, p.y + Math.sin(p.aim || 0) * 8 - 0.5, 1, 1, '#fff');
       drawTag(g, p.idx, p.x, p.y - 7 * p.st.size);
       drawBuffs(g, p, p.x, p.y + p.r + 2);
     }
