@@ -20,10 +20,13 @@ import * as splat from '../games/splat.js';
 import * as tick from '../games/tick.js';
 import * as updraft from '../games/updraft.js';
 import * as lightsout from '../games/lightsout.js';
+import * as mobius from '../games/mobius.js';
+import * as echo from '../games/echo.js';
+import * as mirror from '../games/mirror.js';
 import { Bot } from './bots.js';
 
-export const BUILD = 'm1-2026-11-20.5';
-export const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout };
+export const BUILD = 'm1-2026-11-20.6';
+export const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout, mobius, echo, mirror };
 const GAME_IDS = Object.keys(GAMES);
 const params = new URLSearchParams(location.search);
 const MIN_PLAYERS = params.has('solo') ? 1 : 2;

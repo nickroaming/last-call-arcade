@@ -80,7 +80,7 @@ function build() {
 export function art(i) { if (!cache) build(); return cache[i % 3]; }
 
 /** x = centre, y = feet. size 1 = 11×12 world pixels. */
-export function drawPlayer(g, idx, x, y, { flip = false, size = 1, flash = false, alpha = 1, squash = 0 } = {}) {
+export function drawPlayer(g, idx, x, y, { flip = false, size = 1, flash = false, alpha = 1, squash = 0, flipY = false } = {}) {
   const a = art(idx);
   const img = flash ? a.white : a.body;
   // squash & stretch around the feet
@@ -90,7 +90,7 @@ export function drawPlayer(g, idx, x, y, { flip = false, size = 1, flash = false
   c.globalAlpha = alpha;
   const px = Math.round((x + g.ox) * 2), py = Math.round((y + g.oy) * 2);
   c.translate(px, py);
-  if (flip) c.scale(-1, 1);
+  if (flip || flipY) c.scale(flip ? -1 : 1, flipY ? -1 : 1); // flipY: standing on a ceiling, feet at y
   c.drawImage(img, -img.width * sx / 2, -img.height * sy, img.width * sx, img.height * sy);
   c.restore();
 }

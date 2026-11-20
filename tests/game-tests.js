@@ -17,9 +17,12 @@ import * as splat from '../src/games/splat.js';
 import * as tick from '../src/games/tick.js';
 import * as updraft from '../src/games/updraft.js';
 import * as lightsout from '../src/games/lightsout.js';
+import * as mobius from '../src/games/mobius.js';
+import * as echo from '../src/games/echo.js';
+import * as mirror from '../src/games/mirror.js';
 import { Bot } from '../src/game/bots.js';
 
-const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout };
+const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout, mobius, echo, mirror };
 export const results = [];
 function test(name, fn) { try { fn(); results.push({ name, ok: true }); } catch (e) { results.push({ name, ok: false, err: e.message + (e.stack ? ' @ ' + e.stack.split('\n')[1] : '') }); } }
 function eq(a, b, msg = '') { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg} expected ${JSON.stringify(b)} got ${JSON.stringify(a)}`); }

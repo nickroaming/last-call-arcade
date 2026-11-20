@@ -1,7 +1,7 @@
 # Last Call Arcade
 
 A couch party game for 2-3 players on one Xbox Series X (Edge browser) and one TV.
-Ten arcade minigames; a match plays 8 of them. Every game shares a ROUNDS-style gun: bullets drop, bounce, split, home in and explode. Losers draft trade-off cards that stack into combos. Winners get the Winner's Curse.
+Thirteen arcade minigames; a match plays 8 of them. Every game shares a ROUNDS-style gun: bullets drop, bounce, split, home in and explode. Losers draft trade-off cards that stack into combos. Winners get the Winner's Curse.
 
 - **Play:** https://nickroaming.github.io/last-call-arcade/
 - **Online seat test (remote player):** https://nickroaming.github.io/last-call-arcade/online-test.html · steps in [docs/ONLINE_SEAT_TEST.md](docs/ONLINE_SEAT_TEST.md)
@@ -30,6 +30,9 @@ Ten arcade minigames; a match plays 8 of them. Every game shares a ROUNDS-style 
 | Tick Tock | stick | dash | holding the bomb: throw it; otherwise shoot to shove | block (tags bounce off) |
 | Updraft | stick | jump, double jump | shoot (knock rivals off ledges) | block |
 | Lights Out | stick (flashlight follows) | dash | shoot (shots light the room) | block |
+| Mobius Loop | stick (walk the floor or the ceiling) | jump; double jump past the horizon to fall up | shoot (bullets curve to the closer surface) | block |
+| Echo Chamber | stick | dash | shoot (your echoes repeat it) | block |
+| Mirror Twins | stick moves both bodies (the mirror rule decides how) | both dash | both shoot | both block |
 
 Handy link options: `?events=4` for a short match, `?only=orbit` to practise one game, `?twist=moon` to force a twist, `?solo` to start with one player, `?rules=Toast the winner|Snack break` for your own House Rules prompts.
 
