@@ -7,7 +7,7 @@ import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 
 export const meta = {
-  id: 'tick', name: 'TICK TOCK', color: '#ff5a3a', music: 'rumble',
+  id: 'tick', name: 'TICK TOCK', color: '#ff5a3a', music: 'rumble', tier: 1,
   tagline: 'Hot potato with a live bomb',
   objective: "Don't hold the bomb when it blows. Tag someone, or THROW it: it sticks to whoever it hits.",
   controls: [['STICK', 'Move and aim'], ['X / RT', 'With bomb: throw it. Without: shoot to shove'], ['A', 'Dash'], ['RB', 'Block: tags and throws bounce off']],

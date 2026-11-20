@@ -9,7 +9,7 @@ import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 
 export const meta = {
-  id: 'mobius', name: 'MOBIUS LOOP', color: '#c86bff', music: 'rumble',
+  id: 'mobius', name: 'MOBIUS LOOP', color: '#c86bff', music: 'rumble', tier: 3,
   tagline: 'Two floors. Gravity picks the closer one.',
   objective: 'Last one standing. Double jump past the horizon to fall UP. Side edges flip you over.',
   controls: [['STICK', 'Move and aim'], ['A', 'Jump (x2 = fall up)'], ['X / RT', 'Shoot (bullets curve)'], ['RB', 'Block'], ['R-STICK', 'Aim freely']],

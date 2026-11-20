@@ -10,7 +10,7 @@ import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 
 export const meta = {
-  id: 'echo', name: 'ECHO CHAMBER', color: '#5affd9', music: 'lounge',
+  id: 'echo', name: 'ECHO CHAMBER', color: '#5affd9', music: 'lounge', tier: 3,
   tagline: 'Every 5 seconds your past self comes back',
   objective: 'Last one standing. Every 5 s your past self replays. Its shots hit everyone, even you.',
   controls: [['STICK', 'Move and aim'], ['X / RT', 'Shoot (echoes repeat it)'], ['A', 'Dash'], ['RB', 'Block']],

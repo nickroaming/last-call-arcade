@@ -20,9 +20,12 @@ import * as lightsout from '../src/games/lightsout.js';
 import * as mobius from '../src/games/mobius.js';
 import * as echo from '../src/games/echo.js';
 import * as mirror from '../src/games/mirror.js';
+import * as wormhole from '../src/games/wormhole.js';
+import * as rules from '../src/games/rules.js';
+import * as still from '../src/games/still.js';
 import { Bot } from '../src/game/bots.js';
 
-const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout, mobius, echo, mirror };
+const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout, mobius, echo, mirror, wormhole, rules, still };
 export const results = [];
 function test(name, fn) { try { fn(); results.push({ name, ok: true }); } catch (e) { results.push({ name, ok: false, err: e.message + (e.stack ? ' @ ' + e.stack.split('\n')[1] : '') }); } }
 function eq(a, b, msg = '') { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg} expected ${JSON.stringify(b)} got ${JSON.stringify(a)}`); }
@@ -38,6 +41,17 @@ test('playlist: 8 events from 10 games, no repeats needed, no back-to-back', () 
     eq(new Set(p).size, 8, 'all different');
     ids.forEach((g) => ok(p.filter((x) => x === g).length <= 2));
   }
+});
+test('playlist in acts: grounded first, mind-bending last, no repeats', () => {
+  const tier = { a: 1, b: 1, c: 1, d: 1, e: 1, f: 2, g: 2, h: 3, i: 3, j: 3 };
+  for (let k = 0; k < 200; k++) {
+    const p = makePlaylist(Object.keys(tier), 2, Math.random, 8, (id) => tier[id]);
+    eq(p.length, 8); eq(new Set(p).size, 8, 'no repeats');
+    ok(p.every((g, i) => i === 0 || tier[g] >= tier[p[i - 1]]), 'acts in order: ' + p.join());
+    ok(tier[p[7]] === 3, 'ends in act 3');
+  }
+  const short = makePlaylist(['a', 'b', 'h'], 2, Math.random, 3, (id) => tier[id]);
+  eq(short.length, 3);
 });
 test('playlist: each game twice, never back-to-back', () => {
   for (let k = 0; k < 200; k++) {
@@ -257,6 +271,36 @@ for (const id of Object.keys(GAMES)) {
     ok(game.finished); eq(game.ranking.slice().sort(), [1, 2]);
   });
 }
+test('rule breaker: pushing a word into a blank changes the rule', () => {
+  const fx = new Fx();
+  const game = GAMES.rules.create({ fx, sound: NO_SOUND, variant: 0, players: [1, 2, 3].map((s) => ({ seat: s, idx: s - 1, stats: statsFor({}), pickupMult: 1 })) });
+  const still = new Map([1, 2, 3].map((s) => [s, NO_CONTROLS]));
+  game.update(1 / 60, still);
+  eq(game.rules().STICK, 'NORMAL', 'starts with STICK IS NORMAL');
+  const stick = game.sentences.find((s) => s.id === 'STICK');
+  const tiny = game.tiles.find((q) => q.word === 'TINY');
+  const normal = game.tiles.find((q) => q.word === 'NORMAL');
+  normal.x = 150; normal.y = 100; tiny.x = stick.slot.x; tiny.y = stick.slot.y;
+  game.update(1 / 60, still);
+  eq(game.rules().STICK, 'TINY');
+  ok(game.mods(game.players[0]).size < 1, 'STICK IS TINY shrinks everyone');
+  // a player walking into a word pushes it
+  const p = game.players[0]; const w = game.tiles.find((q) => q.word === 'ICE');
+  p.x = w.x - 8; p.y = w.y + w.h / 2; const x0 = w.x;
+  for (let k = 0; k < 30; k++) game.update(1 / 60, new Map([[1, { ...NO_CONTROLS, mx: 1 }], [2, NO_CONTROLS], [3, NO_CONTROLS]]));
+  ok(w.x > x0 + 5, 'the word moved right');
+});
+test('wormhole: standing on your floor hole sends you out of your wall hole, fast', () => {
+  const fx = new Fx();
+  const game = GAMES.wormhole.create({ fx, sound: NO_SOUND, variant: 0, players: [1, 2].map((s) => ({ seat: s, idx: s - 1, stats: statsFor({}), pickupMult: 1 })) });
+  const still = new Map([1, 2].map((s) => [s, NO_CONTROLS]));
+  const p = game.players[0];
+  p.holes = [{ x: 60, y: 164, nx: 0, ny: -1, owner: p, slot: 0, born: 0 }, { x: 8, y: 100, nx: 1, ny: 0, owner: p, slot: 1, born: 0 }];
+  p.b.x = 60 - p.b.w / 2; p.b.y = 164 - p.b.h; p.b.vy = 0;
+  game.update(1 / 60, still);
+  ok(Math.abs(p.b.y + p.b.h / 2 - 100) < 4, 'came out at the wall hole height, y=' + p.b.y);
+  ok(p.b.x < 30 && p.b.vx > 100, `flung out of the wall: x=${p.b.x.toFixed(1)} vx=${p.b.vx.toFixed(0)}`);
+});
 test('rumble sudden death: ghosts start out and rank last', () => {
   const { game } = playthrough('rumble', { ghosts: [3] });
   ok(game.finished);

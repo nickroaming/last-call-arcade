@@ -23,10 +23,13 @@ import * as lightsout from '../games/lightsout.js';
 import * as mobius from '../games/mobius.js';
 import * as echo from '../games/echo.js';
 import * as mirror from '../games/mirror.js';
+import * as wormhole from '../games/wormhole.js';
+import * as rules from '../games/rules.js';
+import * as still from '../games/still.js';
 import { Bot } from './bots.js';
 
-export const BUILD = 'm1-2026-11-20.6';
-export const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout, mobius, echo, mirror };
+export const BUILD = 'm1-2026-11-20.7';
+export const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout, mobius, echo, mirror, wormhole, rules, still };
 const GAME_IDS = Object.keys(GAMES);
 const params = new URLSearchParams(location.search);
 const MIN_PLAYERS = params.has('solo') ? 1 : 2;
@@ -93,7 +96,7 @@ const anyPressed = (b, seats = null) => input.seats.some((s) => (!seats || seats
 function startMatch() {
   const seats = input.seats.filter((s) => s.active).map((s) => s.n);
   input.joinOpen = false;
-  st.match = new Match(seats, ONLY && GAMES[ONLY] ? [ONLY] : GAME_IDS, { perGame: ONLY ? 4 : 2, total: ONLY ? 4 : EVENTS });
+  st.match = new Match(seats, ONLY && GAMES[ONLY] ? [ONLY] : GAME_IDS, { perGame: ONLY ? 4 : 2, total: ONLY ? 4 : EVENTS, tierOf: ONLY ? null : (id) => GAMES[id].meta.tier || 1 });
   st.variants = {}; st.sdWinner = null;
   toIntro();
 }
@@ -415,7 +418,9 @@ function drawIntro() {
   const t = st.t;
   bg(t, '#120a24', m.color + '33');
   const sd = !!st.match.suddenDeath;
-  g.text(sd ? 'SUDDEN DEATH!' : `EVENT ${st.match.eventIdx + 1} OF ${st.match.eventCount}`, 160, 6, { scale: 2, col: sd ? '#ff5a5a' : '#c8c0ff', align: 'center' });
+  const ACTS = ['', 'WARM-UP', 'THE MACHINE WAKES', 'LAST CALL'];
+  const act = ONLY ? '' : ACTS[m.tier || 1];
+  g.text(sd ? 'SUDDEN DEATH!' : `EVENT ${st.match.eventIdx + 1} OF ${st.match.eventCount}` + (act ? ` - ${act}` : ''), 160, 6, { scale: 2, col: sd ? '#ff5a5a' : (m.tier === 3 ? '#ff5fd2' : m.tier === 2 ? '#9fd3ff' : '#c8c0ff'), align: 'center' });
   const pop = Math.min(1, t * 4);
   g.text(m.name, 160, 16 + (1 - pop) * -20, { scale: 5, col: m.color, align: 'center', shadow: '#000' });
   if (st.twist) {

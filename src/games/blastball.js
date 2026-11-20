@@ -7,7 +7,7 @@ import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 
 export const meta = {
-  id: 'blastball', name: 'BLAST BALL', color: '#7dff8a', music: 'dustlap',
+  id: 'blastball', name: 'BLAST BALL', color: '#7dff8a', music: 'dustlap', tier: 1,
   tagline: 'Pinball soccer with guns',
   objective: 'Guard your goal. Shoot the ball into rivals\' goals. 3 goals against you and you\'re out.',
   controls: [['STICK', 'Move and aim'], ['X / RT', 'Shoot: bullets push the ball'], ['A', 'Dash: smash the ball'], ['RB', 'Block: bounce the ball back hard']],

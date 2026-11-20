@@ -9,7 +9,7 @@ import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js'
 import { S } from '../engine/gfx.js';
 
 export const meta = {
-  id: 'lightsout', name: 'LIGHTS OUT', color: '#ffd84a', music: 'lounge',
+  id: 'lightsout', name: 'LIGHTS OUT', color: '#ffd84a', music: 'lounge', tier: 2,
   tagline: 'A heist in the dark',
   objective: 'Grab the most gems in a pitch-dark warehouse. Your flashlight points where you aim. Shots light the room and knock gems loose.',
   controls: [['STICK', 'Move (flashlight follows)'], ['R-STICK', 'Point the flashlight and aim'], ['X / RT', 'Shoot (bullets glow)'], ['A', 'Dash'], ['RB', 'Block']],

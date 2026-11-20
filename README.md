@@ -1,7 +1,7 @@
 # Last Call Arcade
 
 A couch party game for 2-3 players on one Xbox Series X (Edge browser) and one TV.
-Thirteen arcade minigames; a match plays 8 of them. Every game shares a ROUNDS-style gun: bullets drop, bounce, split, home in and explode. Losers draft trade-off cards that stack into combos. Winners get the Winner's Curse.
+Sixteen arcade minigames in three acts; a match plays 8 of them, starting grounded and ending mind-bending. Creative direction and storyboard: [docs/CREATIVE_DIRECTION.md](docs/CREATIVE_DIRECTION.md). Every game shares a ROUNDS-style gun: bullets drop, bounce, split, home in and explode. Losers draft trade-off cards that stack into combos. Winners get the Winner's Curse.
 
 - **Play:** https://nickroaming.github.io/last-call-arcade/
 - **Online seat test (remote player):** https://nickroaming.github.io/last-call-arcade/online-test.html · steps in [docs/ONLINE_SEAT_TEST.md](docs/ONLINE_SEAT_TEST.md)
@@ -33,6 +33,9 @@ Thirteen arcade minigames; a match plays 8 of them. Every game shares a ROUNDS-s
 | Mobius Loop | stick (walk the floor or the ceiling) | jump; double jump past the horizon to fall up | shoot (bullets curve to the closer surface) | block |
 | Echo Chamber | stick | dash | shoot (your echoes repeat it) | block |
 | Mirror Twins | stick moves both bodies (the mirror rule decides how) | both dash | both shoot | both block |
+| Wormhole | stick | jump, double jump | shoot a hole into a wall (two per player) | block |
+| Rule Breaker | stick (walk into word blocks to push them) | dash | shoot (shots push words too) | block |
+| Still Life | stick (moving makes time move) | dash | shoot (frozen shots hang in the air) | block |
 
 Handy link options: `?events=4` for a short match, `?only=orbit` to practise one game, `?twist=moon` to force a twist, `?solo` to start with one player, `?rules=Toast the winner|Snack break` for your own House Rules prompts.
 

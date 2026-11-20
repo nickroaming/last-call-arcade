@@ -7,7 +7,7 @@ import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 
 export const meta = {
-  id: 'coins', name: 'COIN STORM', color: '#ffd84a', music: 'coins',
+  id: 'coins', name: 'COIN STORM', color: '#ffd84a', music: 'coins', tier: 1,
   tagline: "It's raining money",
   objective: 'Grab the most coins. Shoot rivals and stomp their heads to knock coins loose.',
   controls: [['STICK', 'Move and aim'], ['A', 'Jump (double jump)'], ['X / RT', 'Shoot: hits knock coins loose'], ['RB', 'Block']],

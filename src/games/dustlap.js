@@ -7,7 +7,7 @@ import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 
 export const meta = {
-  id: 'dustlap', name: 'DUST LAP', color: '#ff9a2e', music: 'dustlap',
+  id: 'dustlap', name: 'DUST LAP', color: '#ff9a2e', music: 'dustlap', tier: 1,
   tagline: 'A dusk desert sprint',
   objective: 'Drive through every gate. First to finish the laps wins.',
   controls: [['STICK', 'Steer (point where to go)'], ['A (HOLD)', 'Drift, release to boost'], ['X / RT', 'Blaster: hits spin rivals out'], ['RB', 'Hop over hazards and shots']],

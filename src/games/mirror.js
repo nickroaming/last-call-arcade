@@ -10,7 +10,7 @@ import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 
 export const meta = {
-  id: 'mirror', name: 'MIRROR TWINS', color: '#9fd3ff', music: 'coins',
+  id: 'mirror', name: 'MIRROR TWINS', color: '#9fd3ff', music: 'coins', tier: 2,
   tagline: 'One stick, two bodies, one lying mirror',
   objective: 'Most gems wins. One stick moves you AND your twin on the other side of the mirror.',
   controls: [['STICK', 'Move both (mirror rule)'], ['X / RT', 'Both shoot'], ['A', 'Both dash'], ['RB', 'Both block']],

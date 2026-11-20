@@ -9,8 +9,9 @@ export const POINTS = [3, 2, 1];
  * A playlist of `total` events: every game once (as far as `total` allows),
  * then repeats, at most `perGame` of each, never the same game twice in a row.
  */
-export function makePlaylist(ids, perGame = 2, rng = Math.random, total = null) {
+export function makePlaylist(ids, perGame = 2, rng = Math.random, total = null, tierOf = null) {
   total = total || ids.length * perGame;
+  if (tierOf && total <= ids.length) return actPlaylist(ids, rng, total, tierOf);
   const ok = (p) => p.every((g, i) => i === 0 || g !== p[i - 1]);
   for (let tries = 0; tries < 400; tries++) {
     const first = shuffle(ids, rng).slice(0, Math.min(total, ids.length));
@@ -23,8 +24,26 @@ export function makePlaylist(ids, perGame = 2, rng = Math.random, total = null) 
   return out;
 }
 
+/**
+ * The night in three acts: ~40% grounded games (tier 1), ~25% strange (tier 2),
+ * the rest mind-bending (tier 3). Which games appear is random; the order of
+ * the acts is not. Falls back to other tiers when one runs short.
+ */
+export function actPlaylist(ids, rng, total, tierOf) {
+  const pools = [1, 2, 3].map((k) => shuffle(ids.filter((id) => (tierOf(id) || 1) === k), rng));
+  const want = [Math.round(total * 0.4), Math.round(total * 0.25)];
+  want.push(total - want[0] - want[1]);
+  const out = [];
+  for (let k = 0; k < 3; k++) for (let i = 0; i < want[k] && pools[k].length; i++) out.push({ id: pools[k].shift(), k });
+  const rest = shuffle(pools.flat(), rng); // short tier: borrow from the others
+  while (out.length < total && rest.length) { const id = rest.shift(); out.push({ id, k: tierOf(id) || 1 }); }
+  out.sort((a, b) => a.k - b.k);
+  return out.map((o) => o.id);
+}
+
 export class Match {
-  constructor(seats, gameIds, { perGame = 2, rng = Math.random, total = null } = {}) {
+  constructor(seats, gameIds, { perGame = 2, rng = Math.random, total = null, tierOf = null } = {}) {
+    this.tierOf = tierOf;
     this.seats = seats.slice();
     this.gameIds = gameIds;
     this.perGame = perGame;
@@ -34,7 +53,7 @@ export class Match {
   }
   reset() {
     this.players = this.seats.map((seat) => ({ seat, points: 0, wins: 0, powers: {}, places: [], tipsy: 0 }));
-    this.playlist = makePlaylist(this.gameIds, this.perGame, this.rng, this.total);
+    this.playlist = makePlaylist(this.gameIds, this.perGame, this.rng, this.total, this.tierOf);
     this.eventIdx = 0;
     this.suddenDeath = null;
   }

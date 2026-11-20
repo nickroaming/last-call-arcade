@@ -1,13 +1,13 @@
 // ORBIT OUTPOST: a shootout on a tiny planet with its own gravity.
 // Run all the way around it; bullets fall toward the planet and curve into orbits.
 import { TAU, clamp, rand, approach, angleDiff } from '../engine/util.js';
-import { art, SEAT_COLORS } from '../engine/sprites.js';
+import { drawPlayer, SEAT_COLORS } from '../engine/sprites.js';
 import { Guns, newGunState, hitEffects, tickStatus } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 
 export const meta = {
-  id: 'orbit', name: 'ORBIT OUTPOST', color: '#b48cff', music: 'lounge',
+  id: 'orbit', name: 'ORBIT OUTPOST', color: '#b48cff', music: 'lounge', tier: 2,
   tagline: 'A tiny planet with its own gravity',
   objective: 'Last one standing. Run all the way around the planet. Your bullets curve into orbits.',
   controls: [['STICK', 'Run around the planet / aim'], ['A', 'Jump (double jump)'], ['X / RT', 'Shoot'], ['RB', 'Block'], ['R-STICK', 'Aim freely']],
@@ -258,17 +258,9 @@ export function create(ctx) {
         continue;
       }
       const a = Math.atan2(p.y - C.y, p.x - C.x);
-      const img = p.flashT > 0 ? art(p.idx).white : art(p.idx).body;
       const blink = p.hurtT > 0 && p.hurtT < 0.5 && Math.floor(t * 20) % 2;
-      const c = g.c;
-      c.save(); c.globalAlpha = blink ? 0.5 : 1;
-      c.translate(Math.round((p.x + g.ox) * 2), Math.round((p.y + g.oy) * 2));
-      c.rotate(a + Math.PI / 2);
-      if (p.face < 0) c.scale(-1, 1);
-      const sz = p.st.size, sq = p.squash;
-      const w = img.width * sz * (1 + sq * 0.25), h = img.height * sz * (1 - sq * 0.25);
-      c.drawImage(img, -w / 2, -h / 2, w, h);
-      c.restore();
+      const sz = p.st.size;
+      drawPlayer(g, p.idx, p.x, p.y, { rot: a + Math.PI / 2, anchor: 'center', flip: p.face < 0, size: p.st.size, squash: p.squash, flash: p.flashT > 0, alpha: blink ? 0.5 : 1 });
       if (p.blockT > 0) g.ring(p.x, p.y, 9 * sz, '#5affd9');
       if (p.shields) g.ring(p.x, p.y, 8 * sz, '#9fd3ff55');
       const ox = Math.cos(a) * 11 * sz, oy = Math.sin(a) * 11 * sz;

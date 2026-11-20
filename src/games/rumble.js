@@ -7,7 +7,7 @@ import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 
 export const meta = {
-  id: 'rumble', name: 'RICOCHET ROOFTOP', color: '#33d6ff', music: 'rumble',
+  id: 'rumble', name: 'RICOCHET ROOFTOP', color: '#33d6ff', music: 'rumble', tier: 1,
   tagline: 'A rooftop shootout with bouncing bullets',
   objective: 'Be the last one standing. Falling off costs health and throws you back up.',
   controls: [['STICK', 'Move and aim'], ['A', 'Jump (double jump)'], ['X / RT', 'Shoot (bullets drop and bounce)'], ['RB', 'Block'], ['R-STICK', 'Aim freely']],

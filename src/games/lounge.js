@@ -6,7 +6,7 @@ import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 
 export const meta = {
-  id: 'lounge', name: 'LASER LOUNGE', color: '#ff5fd2', music: 'lounge',
+  id: 'lounge', name: 'LASER LOUNGE', color: '#ff5fd2', music: 'lounge', tier: 1,
   tagline: 'Dodge the light show',
   objective: 'Survive the lasers. Last one dancing wins.',
   controls: [['STICK', 'Move'], ['A', 'Dash'], ['X', 'Turret: fire (when out)'], ['R-STICK', 'Turret: aim']],

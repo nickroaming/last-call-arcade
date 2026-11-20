@@ -6,6 +6,7 @@ Lab results (desktop browser, simulated controllers) and hardware results (real 
 | Build | Date | What changed | Test link |
 | --- | --- | --- | --- |
 | online-test-1 | 2026-11-19 | Online seat test: Xbox hosts and streams a test picture over WebRTC (PeerJS public service for setup, Google STUN, no relay server), the remote player sends controller input, PASS/FAIL on both sides | https://nickroaming.github.io/last-call-arcade/online-test.html |
+| m1-2026-11-20.7 | 2026-11-20 | 3 more games: Wormhole, Rule Breaker, Still Life (16 total). Matches play in three acts (grounded → strange → mind-bending), named on the intro card. Smooth, animated characters (eyes, blink, walk, lean, squash). Creative direction doc | https://nickroaming.github.io/last-call-arcade/ |
 | m1-2026-11-20.6 | 2026-11-20 | 3 mind-bending games: Mobius Loop, Echo Chamber, Mirror Twins (13 total). Title tells a lone player that RT adds a CPU | https://nickroaming.github.io/last-call-arcade/ |
 | m1-2026-11-19.4 | 2026-11-19 | 3 new games: Tick Tock, Updraft, Lights Out (10 total). Office mode: CPU players (C key / RT), Enter starts, IJKL aim | https://nickroaming.github.io/last-call-arcade/ |
 | m1-2026-11-19.3 | 2026-11-19 | ROUNDS-style gun system shared by all games (bounce, split, home, retarget, sticky, explode, boomerang, wind-up, wave, poison, frost, lifesteal, phase). 33 rarity cards with +/- lines. 3 new games (Orbit Outpost, Blast Ball, Splat City). 5 Rooftop maps. Physics twists. Color drift (Subtle/Wild/Off). Winner's Curse (tipsy handicap + optional sip prompt). Arena power-ups weighted to losers. 8-event playlist from 7 games | https://nickroaming.github.io/last-call-arcade/ |
@@ -16,6 +17,12 @@ Lab results (desktop browser, simulated controllers) and hardware results (real 
 **online-test-1** · two tabs of the same Chromium browser on one Mac
 - Host and joiner both PASS: room opened through the PeerJS public service, direct connection made, video at 30 fps (640x360), controller input arriving at about 29/s, remote presses visible in the streamed picture.
 - The 1 ms delay is meaningless (same machine). Not covered: two different homes, Xbox Edge sending video, the PS4 browser, networks that need a relay server.
+
+**m1-2026-11-20.7** · Chromium-based browser pane on macOS, keyboard and CPU players
+- Tests: 109/109 pass. New: act playlist (tiers never go backwards, always ends in act 3, no repeats), Rule Breaker (a word in a blank becomes the rule and changes play; walking into a word pushes it), Wormhole (standing on your floor hole sends you out of your wall hole at speed). Each new game also passes the robot, twist, power, 2-player, CPU-bot and draw tests.
+- CPU runs (3 each): all three new games run the full 50 s. Wormhole: every player had both holes open and the orb changed hands. Still Life: time ranged 10%–100%. Rule Breaker: 14–38 gems per player.
+- Screens checked: new characters on the title, Wormhole with holes on walls and ceilings plus the orb holder, Rule Breaker sentences and word blocks, Still Life time meter and beam, intro card "EVENT 1 OF 8 - WARM-UP". Orbit's rotated characters were broken by the art change; the draw test caught it and it was fixed.
+- Not covered: real Xbox, real people (can everyone say each game's rule after one play?), frame rate on the Series X with the new smooth characters.
 
 **m1-2026-11-20.6** · Chromium-based browser pane on macOS, keyboard and CPU players
 - Tests: 94/94 pass. Each new game: robot playthroughs on 6 variants, every allowed twist, every power card stacked, 2-player, CPU bots finish, draw runs.

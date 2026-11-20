@@ -8,7 +8,7 @@ import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 
 export const meta = {
-  id: 'updraft', name: 'UPDRAFT', color: '#5affd9', music: 'dustlap',
+  id: 'updraft', name: 'UPDRAFT', color: '#5affd9', music: 'dustlap', tier: 1,
   tagline: 'Climb or get zapped',
   objective: 'The screen keeps climbing and the laser floor follows. Last one above it wins. Shoot rivals off their ledges.',
   controls: [['STICK', 'Move and aim'], ['A', 'Jump (double jump)'], ['X / RT', 'Shoot (knockback)'], ['RB', 'Block'], ['DOWN + A', 'Drop through a ledge']],

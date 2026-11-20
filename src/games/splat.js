@@ -7,7 +7,7 @@ import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 
 export const meta = {
-  id: 'splat', name: 'SPLAT CITY', color: '#ff9a2e', music: 'coins',
+  id: 'splat', name: 'SPLAT CITY', color: '#ff9a2e', music: 'coins', tier: 1,
   tagline: 'A paint war in the streets',
   objective: 'Paint the most of the city. Bullets paint as they fly and splat where they land.',
   controls: [['STICK', 'Move and aim (your feet paint too)'], ['X / RT', 'Shoot paint'], ['A', 'Dash'], ['RB', 'Block']],

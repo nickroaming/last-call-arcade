@@ -18,7 +18,7 @@ export class Gfx {
     this.t = 0;
   }
   /** Screen shake offset in world pixels. */
-  setOffset(x, y) { this.ox = Math.round(x); this.oy = Math.round(y); }
+  setOffset(x, y) { this.ox = Math.round(x); this.oy = Math.round(y); this.frameNo = (this.frameNo || 0) + 1; } // called once per frame
   px(v, ui) { return Math.round(v + (ui ? 0 : 0)) * S; }
 
   clear(col) { this.c.fillStyle = col; this.c.fillRect(0, 0, W * S, H * S); }
