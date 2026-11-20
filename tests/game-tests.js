@@ -3,7 +3,8 @@ import { Match, makePlaylist, POINTS } from '../src/game/match.js';
 import { POWERS, statsFor, MAX_STACK, cardLines, cardWhere, pickupMult, withBuffs } from '../src/game/powers.js';
 import { Guns, newGunState } from '../src/game/weapons.js';
 import { TWISTS } from '../src/game/twists.js';
-import { Fx } from '../src/engine/fx.js';
+import { Fx, FLASH_GAP, FLASH_MAX } from '../src/engine/fx.js';
+import { Drift, DRIFT_MODES } from '../src/engine/style.js';
 import { Gfx } from '../src/engine/gfx.js';
 import { NO_SOUND } from '../src/engine/audio.js';
 import { NO_CONTROLS } from '../src/game/controls.js';
@@ -300,6 +301,45 @@ test('wormhole: standing on your floor hole sends you out of your wall hole, fas
   game.update(1 / 60, still);
   ok(Math.abs(p.b.y + p.b.h / 2 - 100) < 4, 'came out at the wall hole height, y=' + p.b.y);
   ok(p.b.x < 30 && p.b.vx > 100, `flung out of the wall: x=${p.b.x.toFixed(1)} vx=${p.b.vx.toFixed(0)}`);
+});
+test('rooftop is a best-of: 2+ rounds, first to 2 wins, under the cap (F-01)', () => {
+  for (let v = 0; v < 5; v++) {
+    const { game, secs } = playthrough('rumble', { variant: v });
+    ok(game.finished, 'finished');
+    ok(game.round >= 2, `only ${game.round} round(s) in v${v}`);
+    const wins = game.players.map((p) => p.wins);
+    ok(Math.max(...wins) >= 2 || game.round >= 5 || secs >= 55, `no winner reached 2: ${wins}`);
+    ok(secs <= 62, `took ${secs}s`);
+    eq(game.ranking[0], game.players.slice().sort((a, b) => b.wins - a.wins)[0].seat, 'most round wins ranks first');
+  }
+});
+test('rooftop: a sudden-death ghost never respawns between rounds', () => {
+  const { game } = playthrough('rumble', { ghosts: [3] });
+  const g3 = game.players.find((p) => p.seat === 3);
+  ok(g3.dead && g3.wins === 0, 'seat 3 stayed a ghost');
+});
+test('full-screen flashes are rate- and brightness-limited (F-08)', () => {
+  const fx = new Fx();
+  fx.flash('#fff', 0.9);
+  ok(fx.flashA <= FLASH_MAX + 1e-9, 'capped brightness');
+  fx.update(0.1); const a1 = fx.flashA; fx.flash('#fff', 0.9);
+  eq(fx.flashA, a1, 'a second flash inside the gap is ignored');
+  fx.update(FLASH_GAP); fx.flash('#fff', 0.9);
+  ok(fx.flashA > 0.2, 'allowed again after the gap');
+  const calm = new Fx(); calm.calm = true; calm.flash('#fff', 1); calm.shake(1);
+  eq(calm.flashA, 0, 'calm mode: no flash'); eq(calm.trauma, 0, 'calm mode: no shake');
+});
+test('colour drift never touches players, hazards or HUD (F-07)', () => {
+  const d = new Drift();
+  for (const mode of ['calm', 'bold']) {
+    d.setMode(mode);
+    for (let t = 0; t < 60; t += 3.7) {
+      d.t = t;
+      eq(d.col('#ff9a2e', 'player'), '#ff9a2e'); eq(d.col('#ff4a4a', 'hazard'), '#ff4a4a');
+      ok(Math.abs(d.offset()) <= DRIFT_MODES[mode].amp + 1e-9, 'within amplitude');
+    }
+  }
+  d.setMode('off'); d.t = 12; eq(d.offset(), 0);
 });
 test('rumble sudden death: ghosts start out and rank last', () => {
   const { game } = playthrough('rumble', { ghosts: [3] });

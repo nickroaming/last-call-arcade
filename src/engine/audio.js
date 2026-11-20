@@ -104,6 +104,12 @@ export class Sound {
       case 'pick': this.tone({ f: 523, dur: 0.08, vol: 0.15 }); this.tone({ f: 784, dur: 0.15, vol: 0.15, at: t + 0.07 }); break;
       case 'join': this.tone({ f: 392, dur: 0.08, vol: 0.15 }); this.tone({ f: 784, dur: 0.14, vol: 0.15, at: t + 0.08 }); break;
       case 'win': [0, 4, 7, 12, 7, 12, 16, 19].forEach((n, i) => this.tone({ f: midi(67 + n), dur: 0.14, vol: 0.16, at: t + i * 0.09, type: i % 2 ? 'square' : 'triangle' })); break;
+      // round won: a rising three-note sting on a bed of noise (shorter than 'win', bigger than 'pick')
+      case 'round': [0, 7, 12].forEach((n, i) => this.tone({ f: midi(64 + n), dur: 0.16, vol: 0.17, at: t + i * 0.07, type: 'square' })); this.noise({ dur: 0.25, vol: 0.12, hp: 3000 }); break;
+      // a card locks in: low thunk + bright click
+      case 'lock': this.tone({ f: 110, f2: 70, type: 'square', dur: 0.1, vol: 0.22 }); this.tone({ f: 1760, dur: 0.05, vol: 0.12, at: t + 0.04 }); break;
+      // a seat is ready
+      case 'ready': this.tone({ f: 784, dur: 0.06, vol: 0.13 }); this.tone({ f: 1047, dur: 0.1, vol: 0.13, at: t + 0.06 }); break;
       case 'lose': [7, 5, 3, 0].forEach((n, i) => this.tone({ f: midi(60 + n), dur: 0.2, vol: 0.12, at: t + i * 0.15, type: 'triangle' })); break;
       default: break;
     }

@@ -104,6 +104,8 @@ export class Gfx {
     lines.forEach((l, i) => this.text(l, x, y + i * this.lineH(scale), opts));
     return lines.length * this.lineH(scale);
   }
+  /** Height a para() would take, without drawing. */
+  paraH(str, maxW, scale = 2) { return wrap(str, Math.floor((maxW * S) / (6 * scale))).length * this.lineH(scale); }
   /** Draw a pre-rendered sprite canvas centred at x, bottom at y. */
   image(img, x, y, { scale = 1, flip = false, alpha = 1, rot = 0, ui = false, anchor = 'bottom' } = {}) {
     const ox = ui ? 0 : this.ox, oy = ui ? 0 : this.oy;

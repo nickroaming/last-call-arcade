@@ -7,6 +7,7 @@ Sixteen arcade minigames in three acts; a match plays 8 of them, starting ground
 - **Online seat test (remote player):** https://nickroaming.github.io/last-call-arcade/online-test.html · steps in [docs/ONLINE_SEAT_TEST.md](docs/ONLINE_SEAT_TEST.md)
 - **Controller test (Milestone 0):** https://nickroaming.github.io/last-call-arcade/controller-test.html
 - Design notes and research on ROUNDS and 8Bit Fiesta: [docs/DESIGN.md](docs/DESIGN.md)
+- Polish audit, design guide and playtest record: [docs/audit/AUDIT.md](docs/audit/AUDIT.md) · [docs/DESIGN_GUIDE.md](docs/DESIGN_GUIDE.md) · [docs/PLAYTEST.md](docs/PLAYTEST.md)
 - Builds and test results: [BUILD_LOG.md](BUILD_LOG.md) · Original brief: [Claude_Game_Brief.md](Claude_Game_Brief.md)
 
 ## How to play (controller only)

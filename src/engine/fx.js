@@ -7,6 +7,9 @@ export const SHAKE_LEVELS = [
   { name: 'OFF', k: 0 },
 ];
 
+export const FLASH_GAP = 0.4;
+export const FLASH_MAX = 0.25;
+
 export class Fx {
   constructor() {
     this.parts = [];
@@ -18,6 +21,8 @@ export class Fx {
     this.slowT = 0;
     this.flashA = 0;
     this.flashCol = '#fff';
+    this.lastFlash = -9;
+    this.calm = false; // reduced motion: no flashes, no shake
     this.t = 0;
   }
   reset() { this.parts.length = 0; this.popups.length = 0; this.rings.length = 0; this.trauma = 0; this.hitstop = 0; this.slowT = 0; this.flashA = 0; }
@@ -31,10 +36,20 @@ export class Fx {
   }
   dust(x, y, col = '#c9a77a', n = 4) { this.burst(x, y, n, col, { speed: 30, life: 0.35, grav: -20, angle: -Math.PI / 2, spread: Math.PI }); }
   ring(x, y, r, col, life = 0.35) { this.rings.push({ x, y, r, col, life, max: life }); }
-  shake(a) { this.trauma = Math.min(1, this.trauma + a); }
+  shake(a) { if (!this.calm) this.trauma = Math.min(1, this.trauma + a); }
   stop(sec) { this.hitstop = Math.max(this.hitstop, sec); }
   slow(sec) { this.slowT = Math.max(this.slowT, sec); }
-  flash(col = '#fff', a = 0.6) { this.flashCol = col; this.flashA = Math.max(this.flashA, a); }
+  /**
+   * Full-screen flash, limited for photosensitivity (XAG 118): at most one
+   * flash every FLASH_GAP seconds, never brighter than FLASH_MAX, and none at
+   * all in reduced-motion mode.
+   */
+  flash(col = '#fff', a = 0.6) {
+    if (this.calm) return;
+    if (this.t - this.lastFlash < FLASH_GAP) return;
+    this.lastFlash = this.t;
+    this.flashCol = col; this.flashA = Math.max(this.flashA, Math.min(a, FLASH_MAX));
+  }
   popup(text, x, y, col = '#fff', scale = 2) { this.popups.push({ text, x, y, col, scale, life: 0.9 }); }
 
   /** Multiplier for game time this frame. */

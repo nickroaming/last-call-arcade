@@ -1,0 +1,104 @@
+/* Couch-readable controller test. Seats differ by shape, pattern and number,
+   not only by color. Sized in vmin so it reads the same on any TV. */
+:root {
+  --bg: #12101c;
+  --panel: #1f1b2e;
+  --ink: #f4f1ff;
+  --dim: #a59fc4;
+  --p1: #ff9a2e;
+  --p2: #33d6ff;
+  --p3: #ff5fd2;
+  --good: #7dff8a;
+  --bad: #ff5a5a;
+  --unit: 1vmin;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden;
+  background: var(--bg); color: var(--ink);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  user-select: none; cursor: none;
+  font-size: calc(var(--unit) * 2.4);
+}
+#app {
+  height: 100%; padding: 4vh 4vw; /* TV overscan margin */
+  display: grid; grid-template-rows: auto auto 1fr auto; gap: 1.6vmin;
+  position: relative;
+}
+.top { display: flex; justify-content: space-between; align-items: baseline; }
+h1 { margin: 0; font-size: 3.4vmin; letter-spacing: .3vmin; font-weight: 900; }
+h1 span { color: var(--dim); font-weight: 600; font-size: 2.4vmin; letter-spacing: 0; }
+.status { color: var(--dim); }
+.status b { color: var(--ink); }
+.small { font-size: 2vmin; color: var(--dim); font-weight: 400; }
+
+.banner { background: var(--panel); border-radius: 1.2vmin; padding: 1.4vmin 2.4vmin; position: relative; min-height: 12vmin; }
+.banner h2 { margin: 0 0 .6vmin; font-size: 4vmin; }
+.banner p { margin: .3vmin 0; font-size: 2.6vmin; }
+.banner .timer { position: absolute; right: 2.4vmin; top: 1vmin; font-size: 9vmin; font-weight: 900; font-variant-numeric: tabular-nums; }
+.bar { height: 1.6vmin; background: #000; border-radius: 1vmin; margin-top: 1vmin; overflow: hidden; width: 70%; }
+.bar b { display: block; height: 100%; background: var(--good); }
+
+.seats { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 2vmin; min-height: 0; }
+.seat {
+  background: var(--panel); border-radius: 1.4vmin; padding: 1.4vmin;
+  border: .6vmin solid var(--c); display: flex; flex-direction: column; gap: 1vmin; min-height: 0;
+}
+.seat.p1 { --c: var(--p1); --pat: repeating-linear-gradient(45deg, var(--c) 0 1vmin, transparent 1vmin 2vmin); }
+.seat.p2 { --c: var(--p2); --pat: radial-gradient(circle, var(--c) 0 .55vmin, transparent .65vmin) 0 0 / 1.8vmin 1.8vmin; }
+.seat.p3 { --c: var(--p3); --pat: conic-gradient(var(--c) 25%, transparent 0 50%, var(--c) 0 75%, transparent 0) 0 0 / 2vmin 2vmin; }
+.seat.st-empty { border-style: dashed; opacity: .75; }
+.seat.st-disconnected { border-style: dotted; }
+.tag { display: flex; align-items: center; gap: 1.4vmin; padding: .6vmin 1.4vmin; border-radius: 1vmin; background: var(--pat), #000; }
+.tag .shape { font-size: 6vmin; color: var(--c); text-shadow: 0 0 .4vmin #000; background: #000; border-radius: 1vmin; padding: 0 1vmin; line-height: 1.2; }
+.tag .num { font-size: 8vmin; font-weight: 900; background: #000; padding: 0 1.2vmin; border-radius: 1vmin; line-height: 1.1; }
+.state { font-size: 2.4vmin; font-weight: 700; }
+.st-empty .state { font-size: 3.4vmin; text-align: center; padding: 3vmin 0; animation: blink 1.2s steps(2) infinite; }
+.st-disconnected .state { color: var(--bad); }
+@keyframes blink { 50% { opacity: .45; } }
+
+.goal { font-size: 3vmin; font-weight: 800; padding: .8vmin 1.2vmin; border-radius: .8vmin; background: #000; border: .4vmin solid var(--dim); }
+.goal.ok { border-color: var(--good); color: var(--good); }
+
+.pad { display: flex; flex-direction: column; gap: .8vmin; }
+.row { display: flex; gap: .8vmin; justify-content: space-between; align-items: center; }
+.row.mid { align-items: center; }
+.b {
+  display: inline-block; min-width: 4.2vmin; padding: .4vmin .6vmin; text-align: center;
+  border: .3vmin solid #4a4466; border-radius: .7vmin; font-weight: 800; font-size: 2vmin; color: var(--dim);
+}
+.b.on { background: var(--ink); color: #000; border-color: var(--ink); transform: scale(1.08); }
+.face, .dpad { display: flex; flex-direction: column; align-items: center; gap: .3vmin; }
+.face > div, .dpad > div { display: flex; gap: 4.4vmin; }
+.stick { width: 11vmin; height: 11vmin; border-radius: 50%; border: .4vmin solid #4a4466; position: relative; display: grid; place-items: center; }
+.stick.on { border-color: var(--ink); }
+.stick i { width: 4vmin; height: 4vmin; border-radius: 50%; background: var(--c); display: block; border: .4vmin solid #000; transition: none; }
+.stick em { position: absolute; left: .6vmin; top: .2vmin; font-style: normal; font-size: 1.8vmin; color: var(--dim); }
+.trig { flex: 1; height: 3vmin; border: .3vmin solid #4a4466; border-radius: .7vmin; position: relative; overflow: hidden; }
+.trig.on { border-color: var(--ink); }
+.trig b { position: absolute; left: 0; top: 0; bottom: 0; background: var(--c); }
+.trig em { position: relative; z-index: 1; font-style: normal; font-weight: 800; font-size: 1.9vmin; padding-left: .8vmin; text-shadow: 0 0 .3vmin #000; }
+
+.footer { color: var(--dim); font-size: 1.9vmin; }
+
+.overlay { position: absolute; inset: 0; z-index: 10; background: #08060e; display: grid; place-items: center; padding: 4vh 4vw; overflow: hidden; }
+.overlay.hidden { display: none; }
+.paused { text-align: center; }
+.paused h2 { font-size: 12vmin; margin: 0; letter-spacing: 1vmin; }
+.paused p { font-size: 3.4vmin; }
+.result { width: 100%; max-height: 100%; overflow: hidden; }
+.verdict { font-size: 11vmin; font-weight: 900; letter-spacing: .8vmin; line-height: 1; }
+.verdict.pass { color: var(--good); }
+.verdict.fail { color: var(--bad); }
+.verdict.incomplete { color: var(--p1); }
+.failseats { font-size: 4.4vmin; font-weight: 900; color: var(--bad); margin: .6vmin 0; }
+.checks { list-style: none; padding: 0; margin: 1vmin 0; font-size: 2.6vmin; }
+.checks li { padding: .4vmin 0; }
+.checks li.pass b { color: var(--good); }
+.checks li.fail b { color: var(--bad); }
+.checks li.skip b { color: var(--p1); }
+.checks .who { background: var(--bad); color: #000; font-weight: 900; padding: 0 .8vmin; border-radius: .5vmin; margin-left: .8vmin; }
+.checks .note { font-size: 1.9vmin; color: var(--dim); padding-left: 4vmin; }
+.diag { font-size: 1.6vmin; color: var(--dim); display: grid; gap: .4vmin; word-break: break-all; }
+.diag b { color: var(--ink); }
+.next { font-size: 2.8vmin; margin-top: 1.2vmin; }

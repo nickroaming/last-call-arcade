@@ -27,8 +27,9 @@ import * as wormhole from '../games/wormhole.js';
 import * as rules from '../games/rules.js';
 import * as still from '../games/still.js';
 import { Bot } from './bots.js';
+import { Drift, P, glyph, prompt } from '../engine/style.js';
 
-export const BUILD = 'm1-2026-11-20.7';
+export const BUILD = 'm1-2026-11-20.8-polish';
 export const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout, mobius, echo, mirror, wormhole, rules, still };
 const GAME_IDS = Object.keys(GAMES);
 const params = new URLSearchParams(location.search);
@@ -36,9 +37,19 @@ const MIN_PLAYERS = params.has('solo') ? 1 : 2;
 const EVENTS = params.get('rounds') === '1' ? 4 : clamp(parseInt(params.get('events') || '8', 10) || 8, 3, 14);
 const FORCE_TWIST = params.get('twist');
 const TWIST_CHANCE = 0.5;
-const TRIP_LEVELS = [{ name: 'SUBTLE', amp: 12, kick: 18, sat: 1.08 }, { name: 'WILD', amp: 45, kick: 90, sat: 1.35 }, { name: 'OFF', amp: 0, kick: 0, sat: 1 }];
+// Colour drift looks (audit F-07). CALM and BOLD drift only the backdrop and
+// inactive geometry through style.js; WILD adds the old whole-screen hue swing.
+const TRIP_LEVELS = [
+  { name: 'CALM', drift: 'calm', amp: 0, kick: 0, sat: 1 },
+  { name: 'BOLD', drift: 'bold', amp: 0, kick: 0, sat: 1 },
+  { name: 'WILD', drift: 'bold', amp: 45, kick: 90, sat: 1.35 },
+  { name: 'OFF', drift: 'off', amp: 0, kick: 0, sat: 1 },
+];
 const ONLY = params.get('only'); // e.g. ?only=lounge to practise one game
 const DRAFT_TIME = 15;
+const DRAFT_AFTER_LOCK = 8;  // once one picker locks, the rest get at most this long (F-11)
+const DRAFT_GUARD = 0.35;    // ignore draft input this long after the screen opens
+const LOCK_BEAT = 0.7;       // hold the locked cards on screen before moving on
 const DEFAULT_PROMPTS = ['Toast the winner!', 'Snack break - grab something', 'Loser picks the next song', 'Everyone swap couch seats', 'Winner tells a bad joke'];
 
 // ---------- setup ----------
@@ -55,16 +66,23 @@ const input = new InputAdapter({
 const canvas = document.getElementById('game');
 const g = new Gfx(canvas);
 const fx = new Fx();
+const drift = new Drift();
 const sound = new Sound();
 
 function load(key, def) { try { const v = localStorage.getItem('lca.' + key); return v === null ? def : JSON.parse(v); } catch (e) { return def; } }
 function save(key, v) { try { localStorage.setItem('lca.' + key, JSON.stringify(v)); } catch (e) { /* ignore */ } }
 const settings = {
-  shake: load('shake', 0), muted: load('muted', false), house: load('house', false), trip: load('trip', 0),
+  shake: load('shake', 0), muted: load('muted', false), house: load('house', false), trip: load('look', 0), calm: load('calm', false),
   prompts: params.get('rules') ? params.get('rules').split('|').map((s) => s.trim()).filter(Boolean).slice(0, 12) : DEFAULT_PROMPTS,
 };
-fx.shakeK = SHAKE_LEVELS[settings.shake].k;
 sound.setMuted(settings.muted);
+function applyLook() {
+  if (!TRIP_LEVELS[settings.trip]) settings.trip = 0;
+  drift.setMode(settings.calm ? 'off' : TRIP_LEVELS[settings.trip].drift);
+  fx.calm = settings.calm;
+  fx.shakeK = settings.calm ? 0 : SHAKE_LEVELS[settings.shake].k;
+}
+applyLook();
 
 // keep the controller from driving the browser
 history.pushState({ lca: 1 }, '');
@@ -117,7 +135,7 @@ function startGame() {
   fx.reset();
   const n = st.match.players.length;
   st.game = GAMES[id].create({
-    fx, sound, variant: v, twist: st.twist,
+    fx, sound, drift, variant: v, twist: st.twist,
     players: st.match.players.map((p) => {
       const stats = st.match.stats(p.seat);
       if (st.twist && st.twist.size) stats.size *= st.twist.size;
@@ -149,7 +167,8 @@ function afterResults() {
   if (order.length) {
     st.draft = {
       next: st.match.next,
-      pickers: order.map((seat) => ({ seat, hand: st.match.offer(seat), cur: 0, picked: null })),
+      pickers: order.map((seat) => ({ seat, hand: st.match.offer(seat), cur: 0, picked: null, lockedAt: null })),
+      deadline: DRAFT_TIME, doneAt: null,
     };
     go('draft');
     return;
@@ -213,6 +232,7 @@ function runBots(dt) {
   }
 }
 function update(dt) {
+  drift.update(dt);
   runBots(dt);
   const events = input.update(performance.now());
   if (events.some((e) => e.type === 'press' || e.type === 'join')) sound.ensure();
@@ -238,6 +258,7 @@ function update(dt) {
     else if (anyPressed(BTN.X, inMatch)) cycleShake();
     else if (anyPressed(BTN.LB, inMatch)) toggleMute();
     else if (anyPressed(BTN.RB, inMatch)) cycleTrip();
+    else if (anyPressed(BTN.B, inMatch)) toggleCalm();
     return;
   }
 
@@ -246,7 +267,7 @@ function update(dt) {
 
   switch (st.screen) {
     case 'intro': {
-      for (const n of inMatch) if (controls.get(n).jumpP && !st.ready.has(n)) { st.ready.add(n); sound.sfx('move'); }
+      for (const n of inMatch) if (controls.get(n).jumpP && !st.ready.has(n) && st.t > 0.25) { st.ready.add(n); sound.sfx('ready'); }
       if ((st.ready.size >= inMatch.length && st.t > 0.6) || st.t > 9) startGame();
       break;
     }
@@ -301,8 +322,9 @@ function tipsyControls(controls, dt) {
     controls.set(p.seat, out);
   }
 }
-function cycleTrip() { settings.trip = (settings.trip + 1) % TRIP_LEVELS.length; save('trip', settings.trip); fx.hueKick = 90; sound.sfx('move'); }
-function cycleShake() { settings.shake = (settings.shake + 1) % SHAKE_LEVELS.length; fx.shakeK = SHAKE_LEVELS[settings.shake].k; save('shake', settings.shake); fx.shake(0.5); sound.sfx('move'); }
+function cycleTrip() { settings.trip = (settings.trip + 1) % TRIP_LEVELS.length; save('look', settings.trip); applyLook(); fx.hueKick = TRIP_LEVELS[settings.trip].kick; sound.sfx('move'); }
+function toggleCalm() { settings.calm = !settings.calm; save('calm', settings.calm); applyLook(); sound.sfx('move'); }
+function cycleShake() { settings.shake = (settings.shake + 1) % SHAKE_LEVELS.length; save('shake', settings.shake); applyLook(); fx.shake(0.5); sound.sfx('move'); }
 function toggleMute() { settings.muted = !settings.muted; sound.setMuted(settings.muted); save('muted', settings.muted); sound.sfx('move'); }
 
 function updateTitle(dt) {
@@ -318,6 +340,7 @@ function updateTitle(dt) {
   if (anyPressed(BTN.LB)) toggleMute();
   if (anyPressed(BTN.RB)) { settings.house = !settings.house; save('house', settings.house); sound.sfx('move'); }
   if (anyPressed(BTN.LT)) cycleTrip();
+  if (anyPressed(BTN.B)) toggleCalm();
   if (anyPressed(BTN.RT)) wantBot += 1;
   const go2 = kbStart; kbStart = false;
   if (input.activeCount >= MIN_PLAYERS && (anyPressed(BTN.X) || anyPressed(BTN.MENU) || go2)) { sound.sfx('go'); startMatch(); }
@@ -325,17 +348,25 @@ function updateTitle(dt) {
 
 function updateDraft(controls) {
   const d = st.draft;
+  if (d.doneAt !== null) { if (st.t - d.doneAt >= LOCK_BEAT) finishDraft(); return; }
   for (const p of d.pickers) {
     if (p.picked) continue;
+    if (st.t < DRAFT_GUARD) continue; // a press carried over from results can't pick (F-11)
     const c = controls.get(p.seat) || NO_CONTROLS;
     if (c.upP) { p.cur = (p.cur + 2) % 3; sound.sfx('move'); }
     if (c.downP) { p.cur = (p.cur + 1) % 3; sound.sfx('move'); }
-    if (c.jumpP) { p.picked = p.hand[p.cur]; sound.sfx('pick'); fx.burst(160, 100, 20, POWER_BY_ID[p.picked].col, { speed: 100, life: 0.6 }); }
+    if (c.jumpP) {
+      p.picked = p.hand[p.cur]; p.lockedAt = st.t; sound.sfx('lock');
+      d.deadline = Math.min(d.deadline, st.t + DRAFT_AFTER_LOCK);
+      const k4 = d.pickers.indexOf(p), n4 = d.pickers.length;
+      fx.ring((n4 === 1 ? 58 : 6 + k4 * 156) + (n4 === 1 ? 102 : 76), 80, 30, POWER_BY_ID[p.picked].col, 0.4);
+    }
   }
   const done = d.pickers.every((p) => p.picked);
-  if ((done && st.t > 0.3) || st.t > DRAFT_TIME) {
-    if (!done) sound.sfx('pick');
-    finishDraft();
+  if (done && st.t > 0.3) { d.doneAt = st.t; return; }
+  if (st.t > d.deadline) {
+    for (const p of d.pickers) if (!p.picked) { p.picked = p.hand[p.cur]; p.lockedAt = st.t; p.auto = true; }
+    sound.sfx('lock'); d.doneAt = st.t;
   }
 }
 
@@ -387,7 +418,7 @@ function drawTitle() {
   const wob = (i) => Math.sin(t * 3 + i * 0.5) * 2;
   const logo = 'LAST CALL';
   const lc = ['#ffd84a', '#ff9a2e', '#ff5fd2', '#33d6ff'];
-  [...logo].forEach((ch, i) => g.text(ch, 160 - 81 + i * 18, 12 + wob(i), { scale: 6, col: lc[i % 4], shadow: '#000' }));
+  [...logo].forEach((ch, i) => g.text(ch, 160 - 81 + i * 18, 12 + (settings.calm ? 0 : wob(i)), { scale: 6, col: lc[i % 4], shadow: '#000' }));
   g.text('ARCADE', 160, 42, { scale: 4, col: '#fff', align: 'center', shadow: '#5a1a6a' });
   input.seats.forEach((s, i) => {
     const x = 60 + i * 100, y = 140;
@@ -403,14 +434,38 @@ function drawTitle() {
     }
   });
   const n = input.activeCount;
+  // the call to action never disappears; only its underline breathes
+  g.rect(70, 57, 180, 12, P.ink, true);
   if (n >= MIN_PLAYERS) {
-    if (Math.floor(t * 3) % 2) g.text('PRESS X, MENU OR ENTER TO START', 160, 59, { scale: 2, col: '#7dff8a', align: 'center' });
-  } else g.text(MIN_PLAYERS > 1 ? (n === 1 ? 'NEED 2: RT ADDS A CPU' : 'NEED 2 OR 3 PLAYERS') : 'PRESS A TO JOIN', 160, 59, { scale: 2, col: '#ffffffaa', align: 'center' });
-  g.text(`Y SHAKE: ${SHAKE_LEVELS[settings.shake].name}  LB SOUND: ${settings.muted ? 'OFF' : 'ON'}  RB HOUSE RULES: ${settings.house ? 'ON' : 'OFF'}  LT COLOR: ${TRIP_LEVELS[settings.trip].name}`, 160, 165, { scale: 1, col: '#c8c0ff', align: 'center' });
+    prompt(g, 'X', 'START THE NIGHT', 160, 59, { col: P.good, align: 'center' });
+    g.alpha(0.4 + 0.3 * Math.sin(t * 3)); g.rect(96, 68, 128, 1, P.good, true); g.alpha(1);
+  } else if (n === 1 && MIN_PLAYERS > 1) prompt(g, 'RT', 'ADD A CPU, OR A TO JOIN', 160, 59, { col: P.text, align: 'center' });
+  else prompt(g, 'A', 'JOIN', 160, 59, { col: P.text, align: 'center' });
+  g.text(`Y SHAKE ${SHAKE_LEVELS[settings.shake].name}  LB SOUND ${settings.muted ? 'OFF' : 'ON'}  RB HOUSE RULES ${settings.house ? 'ON' : 'OFF'}  LT COLOR ${TRIP_LEVELS[settings.trip].name}  B CALM ${settings.calm ? 'ON' : 'OFF'}`, 160, 165, { scale: 1, col: P.dim, align: 'center' });
   g.text('KEYS: WASD MOVE  SPACE=A  F=SHOOT  G=BLOCK  IJKL=AIM  ENTER=START  C=ADD CPU', 160, 172, { scale: 1, col: '#9a90c0', align: 'center' });
   g.text(BUILD, 318, 2, { scale: 1, col: '#5a5080', align: 'right' });
   if (sound.blocked && !settings.muted) g.text('SOUND STARTS AFTER YOUR FIRST BUTTON PRESS', 160, 96, { scale: 1, col: '#ffd84a', align: 'center' });
   fx.draw(g);
+}
+
+function readyStrip(y) {
+  // one column per seat: character, name, and a READY state you can see from the couch
+  const ps = st.match.players;
+  const colW = 320 / ps.length;
+  ps.forEach((p, k) => {
+    const i = p.seat - 1, x0 = k * colW, cx = x0 + colW / 2;
+    const ready = st.ready.has(p.seat);
+    g.rect(x0 + 3, y, colW - 6, 34, ready ? '#13261c' : P.panel, true);
+    g.frame(x0 + 3, y, colW - 6, 34, ready ? P.good : SEAT_COLORS[i], 1, true);
+    const hop = ready && !settings.calm ? Math.abs(Math.sin(st.t * 6 + k)) * 2 : 0;
+    drawPlayer(g, i, x0 + 18, y + 26 - hop, { size: 1.3, squash: hop < 0.5 && ready ? 0.3 : 0 });
+    g.text(`P${p.seat} ${SEAT_NAMES[i]}`, x0 + 32, y + 4, { scale: 2, col: SEAT_COLORS[i], shadow: null });
+    if (ready) g.text('READY', x0 + 32, y + 15, { scale: 2, col: P.good, shadow: null });
+    else prompt(g, 'A', 'READY?', x0 + 32, y + 15, { col: P.text });
+    const cards = Object.values(p.powers).reduce((a2, n2) => a2 + n2, 0);
+    const extra = (cards ? `${cards} CARD${cards > 1 ? 'S' : ''}` : '') + (p.tipsy ? `${cards ? '  ' : ''}${TIPSY_NAMES[p.tipsy]}` : '');
+    if (extra) g.text(extra, x0 + 32, y + 26, { scale: 1, col: p.tipsy ? '#ffb03a' : P.dim, shadow: null });
+  });
 }
 
 function drawIntro() {
@@ -424,37 +479,37 @@ function drawIntro() {
   const pop = Math.min(1, t * 4);
   g.text(m.name, 160, 16 + (1 - pop) * -20, { scale: 5, col: m.color, align: 'center', shadow: '#000' });
   if (st.twist) {
-    const hue = (t * 120) % 360;
-    g.text(`TWIST! ${st.twist.name}`, 160, 35, { scale: 2, col: `hsl(${hue},100%,70%)`, align: 'center' });
+    g.text(`TWIST: ${st.twist.name}`, 160, 35, { scale: 2, col: P.warn, align: 'center' });
     g.text(st.twist.desc, 160, 43, { scale: 1, col: '#fff', align: 'center' });
   } else g.text(m.tagline.toUpperCase(), 160, 37, { scale: 2, col: '#fff', align: 'center' });
-  panel(8, 49, 304, 21, st.twist ? `hsl(${(t * 120) % 360},100%,60%)` : m.color);
+  if (m.card) {
+    // short card: two rule lines, three buttons, one danger line. Everything at reading size.
+    const c = m.card;
+    panel(8, 50, 304, 24, m.color, P.panel);
+    g.text(sd ? 'TIED PLAYERS ONLY. EVERYONE ELSE DROPS ANVILS' : c.rule, 160, 53, { scale: 2, col: P.text, align: 'center' });
+    g.text(c.rule2, 160, 63, { scale: 2, col: P.warn, align: 'center' });
+    const items = [['STICK', 'MOVE'], ...c.keys];
+    const widths = items.map(([b2, txt]) => g.textW(txt, 2) + (b2.length === 1 ? 13 : g.textW(b2, 2) + 10) + 10);
+    let x = 160 - widths.reduce((a2, w) => a2 + w, 0) / 2;
+    items.forEach(([b2, txt], k) => { prompt(g, b2, txt, x, 82); x += widths[k]; });
+    g.text('DANGER', 160 - (g.textW(c.danger, 2) + g.textW('DANGER ', 2)) / 2, 100, { scale: 2, col: P.danger });
+    g.text(c.danger, 160 - (g.textW(c.danger, 2) + g.textW('DANGER ', 2)) / 2 + g.textW('DANGER ', 2), 100, { scale: 2, col: P.text });
+    readyStrip(116);
+    g.text(`TIEBREAK: ${m.tiebreak}`, 160, 173, { scale: 1, col: '#8a80b0', align: 'center' });
+    fx.draw(g);
+    return;
+  }
+  panel(8, 49, 304, 21, m.color);
   g.para(sd ? `Tied players fight it out. Everyone else is a ghost who drops anvils. ${m.objective}` : m.objective, 12, 51, 296, { scale: 2, col: '#fff' });
-  // controls
   panel(8, 73, 150, 64);
   g.text('CONTROLS', 12, 76, { scale: 1, col: '#c8c0ff' });
-  m.controls.forEach(([b, txt], i) => { const w = chip(b, 12, 84 + i * 10, '#ffd84a'); g.text(txt, 12 + w + 3, 84 + i * 10, { scale: 1, col: '#fff' }); });
-  // hazards and powers
+  m.controls.forEach(([b2, txt], i) => { const w = glyph(g, b2.split(' / ')[0], 12, 84 + i * 10, 1) + 2; g.text(txt, 12 + w + 2, 84 + i * 10, { scale: 1, col: '#fff' }); });
   panel(162, 73, 150, 64);
   g.text('DODGE', 166, 76, { scale: 1, col: '#ff5a5a' });
   const hz = g.para(m.hazards, 166, 83, 142, { scale: 1, col: '#ffb0b0' });
   g.text('WHEN OUT', 166, 86 + hz, { scale: 1, col: '#c8c0ff' });
   g.para(m.ghost, 166, 93 + hz, 142, { scale: 1, col: '#fff' });
-  // each player's powers in this game
-  let y = 141;
-  for (const p of st.match.players) {
-    const i = p.seat - 1;
-    const ids = Object.entries(p.powers);
-    const ready = st.ready.has(p.seat);
-    g.text(`P${p.seat}`, 10, y, { scale: 2, col: SEAT_COLORS[i] });
-    g.text(ready ? 'READY!' : 'A = READY', 312, y, { scale: 1, col: ready ? '#7dff8a' : '#888', align: 'right' });
-    let x = 30;
-    if (p.tipsy) { x += g.text(`${TIPSY_NAMES[p.tipsy]}: ${TIPSY_LINES[p.tipsy].join(', ')}`, x, y + 1, { scale: 1, col: '#ffb03a' }) + 4; }
-    if (!ids.length) g.text(p.tipsy ? '' : 'No cards yet', x, y + 1, { scale: 1, col: '#777' });
-    else g.text(ids.map(([id, n]) => `${POWER_BY_ID[id].name}${n > 1 ? ' X' + n : ''}`).join(', ').slice(0, Math.floor((300 - x) / 3)), x, y + 1, { scale: 1, col: '#ddd' });
-    y += 11;
-  }
-  g.text(`TIEBREAK: ${m.tiebreak}`, 160, 175, { scale: 1, col: '#8a80b0', align: 'center' });
+  readyStrip(141);
   fx.draw(g);
 }
 
@@ -468,14 +523,39 @@ function drawHud() {
     const bx = ps.length === 2 ? [4, 260][k] : [4, 196, 260][k];
     g.rect(bx, 2, 2, 10, SEAT_COLORS[i], true);
     g.text(`P${p.seat}`, bx + 4, 3, { scale: 2, col: SEAT_COLORS[i], shadow: null });
-    const val = game.hud(p.seat);
-    const small = val.length > 5;
-    g.text(val, bx + 19, small ? 5 : 3, { scale: small ? 1 : 2, col: val.includes('@') ? '#ff5a5a' : val.startsWith('$') ? '#ffd84a' : '#fff', shadow: null });
+    const info = game.hudInfo ? game.hudInfo(p.seat) : null;
+    if (info) {
+      let x = bx + 18;
+      for (let w = 0; w < info.pipMax; w++) { if (w < info.pips) g.circle(x + 3, 7, 2.6, SEAT_COLORS[i], true); else g.ring(x + 3, 7, 2.6, '#6a6290', true); x += 7; }
+      g.text(info.text, x + 2, 3, { scale: 2, col: info.warn ? P.danger : P.text, shadow: null });
+    } else {
+      const val = game.hud(p.seat);
+      const small = val.length > 5;
+      g.text(val, bx + 19, small ? 5 : 3, { scale: small ? 1 : 2, col: val.includes('@') ? '#ff5a5a' : val.startsWith('$') ? '#ffd84a' : '#fff', shadow: null });
+    }
     for (let k = 0; k < p.tipsy; k++) g.rect(bx + 4 + k * 3, 12, 2, 2, '#ffb03a', true);
   });
   if (st.twist) g.text(st.twist.name, 160, 16, { scale: 1, col: `hsl(${(performance.now() / 8) % 360},100%,70%)`, align: 'center' });
   const tl = Math.ceil(game.timeLeft);
   g.text(String(tl), 160, 2, { scale: 3, col: tl <= 5 ? (Math.floor(st.t * 4) % 2 ? '#ff5a5a' : '#fff') : '#fff', align: 'center', shadow: null });
+}
+
+/** Ring + name over each player so everyone finds themselves before play starts. */
+function spotlight(a) {
+  if (!st.game || !st.game.players) return;
+  for (const p of st.game.players) {
+    if (!p.pos || p.dead || p.out || p.perma || p.ghost === true) continue;
+    const [x, y] = p.pos();
+    const i = p.idx ?? p.seat - 1;
+    const r = 13 + (settings.calm ? 0 : Math.sin(st.t * 6) * 1.5);
+    g.alpha(a); g.ring(x, y, r, SEAT_COLORS[i]); g.ring(x, y, r + 1, SEAT_COLORS[i]);
+    const label = `P${i + 1} ${SEAT_NAMES[i]}`;
+    const w = g.textW(label, 2) + 6;
+    const ly = Math.max(18, y - r - 14);
+    g.rect(x - w / 2, ly - 1, w, 10, P.ink); g.frame(x - w / 2, ly - 1, w, 10, SEAT_COLORS[i]);
+    g.text(label, x, ly + 0.5, { scale: 2, col: SEAT_COLORS[i], align: 'center', shadow: null, ui: false });
+    g.alpha(1);
+  }
 }
 
 function drawPlay() {
@@ -486,11 +566,13 @@ function drawPlay() {
     const k = 3 - st.t * 1.25;
     const n = Math.ceil(k);
     const frac = k - Math.floor(k);
-    g.alpha(0.35); g.rect(0, 15, 320, 165, '#000', true); g.alpha(1);
-    g.text(GAMES[st.gameId].meta.name, 160, 50, { scale: 3, col: GAMES[st.gameId].meta.color, align: 'center' });
-    g.text(String(n), 160, 72, { scale: Math.round(6 + frac * 6), col: '#fff', align: 'center', shadow: '#000' });
+    g.alpha(0.3); g.rect(0, 15, 320, 165, '#000', true); g.alpha(1);
+    spotlight(1);
+    g.text(GAMES[st.gameId].meta.name, 160, 22, { scale: 3, col: GAMES[st.gameId].meta.color, align: 'center', shadow: '#000' });
+    g.text(String(n), 160, 40, { scale: Math.round(5 + (settings.calm ? 0 : frac * 3)), col: '#fff', align: 'center', shadow: '#000' });
   } else if (st.screen === 'play' && st.t < 0.6) {
-    g.text('GO!', 160, 72, { scale: 8, col: '#7dff8a', align: 'center', shadow: '#000' });
+    spotlight(1 - st.t / 0.6);
+    g.text('GO!', 160, 40, { scale: 6, col: P.good, align: 'center', shadow: '#000' });
   } else if (st.screen === 'finish') {
     const w = st.match.suddenDeath ? st.sdWinner : st.lastRanking[0];
     const i = w - 1;
@@ -532,13 +614,13 @@ function drawResults() {
   });
   const left = st.match.eventCount - st.match.eventIdx - 1;
   g.text(st.match.suddenDeath ? 'SUDDEN DEATH DECIDED IT' : left ? `${left} EVENT${left > 1 ? 'S' : ''} LEFT. NEXT: ${GAMES[st.match.next].meta.name}` : 'LAST EVENT DONE!', 160, 112, { scale: 2, col: '#fff', align: 'center' });
-  if (!st.match.isLast && !st.match.suddenDeath) g.text('2ND AND 3RD PICK A POWER NEXT', 160, 124, { scale: 1, col: '#ffd84a', align: 'center' });
+  if (!st.match.isLast && !st.match.suddenDeath) g.text('LOSERS PICK A POWER NEXT', 160, 124, { scale: 2, col: P.warn, align: 'center' });
   if (st.awards) {
     const w = st.awards[0];
-    g.text(`WINNER'S CURSE: P${w.seat} IS NOW ${TIPSY_NAMES[w.tipsy]} (WOBBLY STICK, SHAKY AIM). LOSERS SOBER UP.`, 160, 136, { scale: 1, col: '#ffb03a', align: 'center' });
-    g.text('POWER-UP ICONS IN THE ARENA HELP LAST PLACE 2X AND THE LEADER LEAST', 160, 145, { scale: 1, col: '#c8c0ff', align: 'center' });
+    g.text(`CURSE: P${w.seat} IS NOW ${TIPSY_NAMES[w.tipsy]}`, 160, 136, { scale: 2, col: '#ffb03a', align: 'center' });
+    if (st.match.eventIdx === 0) g.text('WOBBLY STICK, SHAKY AIM. LOSERS GET 2X FROM ARENA POWER-UPS.', 160, 148, { scale: 1, col: P.dim, align: 'center' });
   }
-  if (t > 1.2) g.text('A: CONTINUE', 160, 166, { scale: 2, col: '#7dff8a', align: 'center' });
+  if (t > 1.2) { g.rect(96, 163, 128, 12, P.ink, true); prompt(g, 'A', 'CONTINUE', 160, 165, { col: P.good, align: 'center' }); }
   fx.draw(g);
 }
 
@@ -555,42 +637,74 @@ function drawDraft() {
   const d = st.draft;
   const t = st.t;
   bg(t, '#0c0a1e', '#1a1440');
-  g.text('COMEBACK DRAFT', 160, 4, { scale: 3, col: '#ffd84a', align: 'center' });
+  g.text('COMEBACK DRAFT', 160, 3, { scale: 3, col: P.warn, align: 'center' });
   const winner = st.lastRanking[0];
-  g.text(`P${winner} WON: NO CARD, AND NOW ${TIPSY_NAMES[st.match.player(winner).tipsy]}.  NEXT: ${GAMES[d.next].meta.name}`, 160, 18, { scale: 1, col: '#c8c0ff', align: 'center' });
+  g.text(`P${winner} WON: NO CARD.  NEXT: ${GAMES[d.next].meta.name}`, 160, 17, { scale: 2, col: P.dim, align: 'center' });
   const n = d.pickers.length;
-  const colW = n === 1 ? 200 : 154;
+  const colW = n === 1 ? 204 : 152;
   d.pickers.forEach((p, k) => {
-    const x0 = n === 1 ? 60 : 6 + k * 158;
+    const x0 = n === 1 ? 58 : 6 + k * 156;
     const i = p.seat - 1;
     const place = st.lastRanking.indexOf(p.seat) + 1;
-    drawPlayer(g, i, x0 + 8, 40, { size: 1.2 });
-    g.text(`P${p.seat} PICKS`, x0 + 18, 28, { scale: 2, col: SEAT_COLORS[i] });
-    g.text(`${ordinal(place)} PLACE${k === 0 ? ' - PICKS FIRST' : ''}`, x0 + 18, 37, { scale: 1, col: '#aaa' });
+    const locked = !!p.picked;
+    // column header: who, what place, and their state
+    drawPlayer(g, i, x0 + 8, 42, { size: 1.2, squash: locked && !settings.calm ? Math.max(0, 0.5 - (t - p.lockedAt) * 2) : 0 });
+    g.text(`P${p.seat} ${ordinal(place)}`, x0 + 18, 29, { scale: 2, col: SEAT_COLORS[i], shadow: null });
+    g.text(locked ? (p.auto ? 'AUTO-PICKED' : 'LOCKED') : 'CHOOSING', x0 + colW, 29, { scale: 2, col: locked ? P.good : P.dim, align: 'right', shadow: null });
+    let y = 45;
     p.hand.forEach((id, c) => {
       const pw = POWER_BY_ID[id];
-      const y = 46 + c * 40;
-      const sel = p.cur === c;
       const chosen = p.picked === id;
+      if (locked && !chosen) return;                 // committed: the other cards fold away
+      const focus = !locked && p.cur === c;
       const have = st.match.player(p.seat).powers[id] || 0;
-      const dim = p.picked && !chosen;
-      g.alpha(dim ? 0.35 : 1);
-      panel(x0, y, colW, 37, sel || chosen ? pw.col : '#3a3458', sel ? '#1c1638' : '#110e22');
-      if (sel && !p.picked) { g.frame(x0 - 1, y - 1, colW + 2, 39, '#fff', 1, true); g.text('>', x0 - 5, y + 14, { scale: 2, col: '#fff' }); }
       const rar = RARITY[pw.rarity];
-      g.rect(x0 + 3, y + 3, 12, 12, pw.col, true);
-      g.text(pw.kind === 'gun' ? 'G' : pw.kind === 'block' ? 'B' : '@', x0 + 9, y + 5.5, { scale: 2, col: '#0b0a12', align: 'center', shadow: null });
-      g.text(pw.name, x0 + 18, y + 2, { scale: 2, col: '#fff' });
-      g.text(have ? `${rar.name}  X${have}>X${have + 1}` : rar.name, x0 + colW - 3, y + 3, { scale: 1, col: have ? '#ffd84a' : rar.col, align: 'right' });
-      cardLines(pw).forEach((ln, k) => g.text(ln.text.slice(0, Math.floor((colW - 20) / 3)), x0 + 18, y + 11 + k * 5.5, { scale: 1, col: ln.bad ? '#ff8a8a' : '#7dff8a' }));
-      g.text(('NEXT: ' + cardWhere(pw, GAMES[d.next].meta)).slice(0, Math.floor((colW - 8) / 3)), x0 + 4, y + 30, { scale: 1, col: '#ffd84a' });
-      if (chosen) g.text('PICKED!', x0 + colW - 3, y + 20, { scale: 2, col: '#ffd84a', align: 'right' });
-      g.alpha(1);
+      if (!focus && !chosen) {                        // browsing: a compact row
+        panel(x0, y, colW, 15, '#3a3458', P.panel);
+        g.rect(x0 + 3, y + 3, 9, 9, pw.col, true);
+        g.text(pw.name, x0 + 16, y + 4, { scale: 2, col: P.dim, shadow: null });
+        y += 18; return;
+      }
+      // focused or locked: the full card, everything at reading size
+      const lines = cardLines(pw);
+      const where = cardWhere(pw, GAMES[d.next].meta);
+      const lift = focus && !settings.calm ? Math.sin(t * 4) * 0.6 : 0;
+      const yy = y - 1 + lift;
+      const h0 = 16;
+      let h = h0;
+      const lineH = lines.map((ln) => Math.max(8, g.paraH(ln.text, colW - 10, 2)));
+      h += lineH.reduce((a2, v) => a2 + v + 1, 0) + 12;
+      panel(x0, yy, colW, h, chosen ? P.good : pw.col, focus ? P.panelHi : '#132218');
+      if (focus) { g.frame(x0 - 1, yy - 1, colW + 2, h + 2, P.warn, 1, true); g.text('>', x0 - 6, yy + 4, { scale: 2, col: P.warn }); }
+      g.rect(x0 + 3, yy + 3, 11, 11, pw.col, true);
+      g.text(pw.kind === 'gun' ? 'G' : pw.kind === 'block' ? 'B' : '@', x0 + 8.5, yy + 5, { scale: 2, col: P.ink, align: 'center', shadow: null });
+      g.text(pw.name, x0 + 18, yy + 4, { scale: 2, col: P.text, shadow: null });
+      if (!chosen) g.text(have ? `X${have + 1}` : rar.name, x0 + colW - 3, yy + 5, { scale: 1, col: have ? P.warn : rar.col, align: 'right', shadow: null });
+      let ly = yy + h0;
+      lines.forEach((ln, k2) => { g.para(ln.text, x0 + 5, ly, colW - 10, { scale: 2, col: ln.bad ? '#ff8a8a' : P.good }); ly += lineH[k2] + 1; });
+      g.text(`NEXT: ${where}`.slice(0, Math.floor((colW - 8) / 3)), x0 + 5, ly + 1, { scale: 1, col: P.warn, shadow: null });
+      if (chosen) { // the stamp lands in the corner, where the rarity was
+        const k3 = Math.min(1, (t - p.lockedAt) * 5);
+        g.alpha(k3); g.rect(x0 + colW - 46, yy + 2, 44, 11, P.good, true);
+        g.text('LOCKED', x0 + colW - 24, yy + 4, { scale: 2, col: P.ink, align: 'center', shadow: null }); g.alpha(1);
+      }
+      y += h + 3;
     });
   });
-  const left = Math.max(0, DRAFT_TIME - t);
-  g.rect(20, 172, 280 * (left / DRAFT_TIME), 4, left < 5 ? '#ff5a5a' : '#ffd84a', true);
-  g.text(`STICK UP/DOWN, A TO PICK.  ${Math.ceil(left)}s, THEN THE HIGHLIGHTED CARD IS PICKED`, 160, 164, { scale: 1, col: '#c8c0ff', align: 'center' });
+  // footer: what to press, who we're waiting on, how long
+  const left = Math.max(0, d.deadline - t);
+  const waiting = d.pickers.filter((p) => !p.picked);
+  g.rect(0, 156, 320, 24, P.ink, true);
+  if (d.doneAt !== null) g.text('POWERS LOCKED IN', 160, 159, { scale: 2, col: P.good, align: 'center' });
+  else if (waiting.length < d.pickers.length) g.text(`WAITING ON ${waiting.map((p) => 'P' + p.seat).join(' AND ')}: ${Math.ceil(left)}`, 160, 159, { scale: 2, col: P.warn, align: 'center' });
+  else {
+    const wv = g.textW('BROWSE', 2) + 17, wa = g.textW('LOCK IN', 2) + 17, wt = g.textW(`${Math.ceil(left)}s`, 2);
+    let x = 160 - (wv + wa + wt + 24) / 2;
+    x += prompt(g, 'STICK', 'BROWSE', x, 159) + 12;
+    x += prompt(g, 'A', 'LOCK IN', x, 159) + 12;
+    g.text(`${Math.ceil(left)}s`, x, 159.5, { scale: 2, col: P.dim });
+  }
+  g.rect(20, 172, 280 * Math.min(1, left / DRAFT_TIME), 3, left < 5 ? P.danger : P.warn, true);
   fx.draw(g);
 }
 
@@ -630,8 +744,8 @@ function drawPause() {
     return;
   }
   g.text('PAUSED', 160, 40, { scale: 6, col: '#fff', align: 'center' });
-  const rows = [['A', 'RESUME'], ['X', `SCREEN SHAKE: ${SHAKE_LEVELS[settings.shake].name}`], ['LB', `SOUND: ${settings.muted ? 'OFF' : 'ON'}`], ['RB', `COLOR DRIFT: ${TRIP_LEVELS[settings.trip].name}`], ['Y', 'QUIT TO TITLE']];
-  rows.forEach(([b, txt], k) => { const w = chip(b, 100, 82 + k * 14, '#ffd84a'); g.text(txt, 100 + w + 4, 82 + k * 14, { scale: 2, col: '#fff' }); });
+  const rows = [['A', 'RESUME'], ['X', `SCREEN SHAKE: ${SHAKE_LEVELS[settings.shake].name}`], ['LB', `SOUND: ${settings.muted ? 'OFF' : 'ON'}`], ['RB', `COLOR DRIFT: ${TRIP_LEVELS[settings.trip].name}`], ['B', `CALM MODE: ${settings.calm ? 'ON' : 'OFF'}`], ['Y', 'QUIT TO TITLE']];
+  rows.forEach(([b, txt], k) => prompt(g, b, txt, 92, 78 + k * 13, { col: P.text }));
 }
 
 // ---------- loop ----------
@@ -665,6 +779,6 @@ requestAnimationFrame(frame);
 
 // For automated browser checks only.
 window.__lca = {
-  st, input, fx, sound, settings, GAMES,
+  st, input, fx, sound, settings, GAMES, drift, applyLook, bots,
   step(n = 1) { for (let i = 0; i < n; i++) update(STEP); draw(); },
 };

@@ -66,6 +66,35 @@ Severity: **Blocker** (breaks a game night or the TV read), **Major** (felt ever
 | **F-13** | Whole match | Minor | [O] pass 1 | 8 events took ~4 min. | Below the 5–8 min target. Feels over fast for the setup. | F-01 lengthens Rooftop. Revisit other shooters (backlog). | Match 5–8 min in CPU runs. |
 | **F-14** | Rooftop | Minor | [O] pass 2 | Ghost anvils keep knocked-out players busy. | Good: no dead air after elimination. | Keep, and carry it across rounds (ghosts come back next round). | — |
 
+### Verification status (build `m1-2026-11-20.8-polish`, 2026-11-20, browser pane, not Series X)
+| ID | Status | Check result |
+| --- | --- | --- |
+| F-01 | Shipped (Rooftop) | 24.4 s avg, 2.7 rounds. Idle player 0/30 events, 9% of rounds (target < 15%) ✔ |
+| F-02 | Shipped for Rooftop's intro, ready strip, results, draft, HUD, pause | Other events' intros still scale 1 → B-01 |
+| F-03 | Shipped (all events) | Ready strip + countdown spotlight seen in `after_intro_ready.png`, `after_countdown_rumble.png` ✔ |
+| F-04 | Shipped | Prompt present every frame (`after_lobby.png`) ✔ |
+| F-05 | Shipped (Rooftop) | HUD pips + OUT. Everyone-fell rounds explained ✔ |
+| F-06 | Shipped | Headers CHOOSING / LOCKED / AUTO-PICKED ✔ |
+| F-07 | Shipped (mechanism + Rooftop) | Unit test: seat and hazard colours never drift ✔. Other events → B-02 |
+| F-08 | Shipped | Unit test: flash limiter + Calm Mode ✔ |
+| F-09 | Shipped on shared screens | ✔ |
+| F-10 | Shipped (Rooftop) | Platform edge 8.2:1 vs backdrop. Fill 1.22:1 → B-06 |
+| F-11 | Shipped | Guard and wait text verified ✔ |
+| F-12 | Shipped | ✔ |
+| F-13 | Partly (Rooftop longer) | Whole-match length not re-measured → B-03 |
+| F-14 | Kept, and ghosts return each round | ✔ |
+
+### Matched before / after
+| Screen | Sheet | What to look at |
+| --- | --- | --- |
+| Lobby | `captures/compare_lobby.png` | Steady "[X] START THE NIGHT". Calm setting visible |
+| Intro | `captures/compare_intro.png` | ~70 words of small text → two rule lines, four glyphs, one danger line, ready strip |
+| Countdown | `captures/compare_countdown.png` | Tiny P-tags → ring + name on every player |
+| Play | `captures/compare_play.png` | Busy backdrop → calm layers. "P3 WINS" with everyone GHOST → round banner with pips |
+| Results | `captures/compare_results.png` | Two small fine-print lines → three readable lines |
+| Draft | `captures/compare_draft.png` | Three equal small cards → one expanded focus card, LOCKED stamp, "WAITING ON P1" |
+| Studies | `captures/study_A_vs_B_rumble.png` | CALM vs BOLD drift at the peaks of each cycle |
+
 ### Assumptions and open questions
 - **[A]** Text size math assumes the 640×360 canvas fills a 1080p TV (Edge full screen). If Edge shows its address bar, the game is a little smaller still.
 - **[A]** Real players will last longer than CPUs, which shoot almost constantly. Rooftop may run ~1.5× longer with people, which is still short.

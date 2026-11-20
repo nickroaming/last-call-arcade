@@ -45,9 +45,9 @@ export function readControls(seat) {
 // ---------- keyboard controllers (for testing on a computer) ----------
 const KB_MAPS = [
   { name: 'Keyboard 1 (WASD)', up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', aim: ['KeyI', 'KeyK', 'KeyJ', 'KeyL'],
-    [BTN.A]: 'Space', [BTN.X]: 'KeyF', [BTN.RB]: 'KeyG', [BTN.Y]: 'KeyR', [BTN.LB]: 'KeyE', [BTN.MENU]: 'Enter', [BTN.VIEW]: 'Tab' },
+    [BTN.A]: 'Space', [BTN.B]: 'KeyQ', [BTN.X]: 'KeyF', [BTN.RB]: 'KeyG', [BTN.Y]: 'KeyR', [BTN.LB]: 'KeyE', [BTN.MENU]: 'Enter', [BTN.VIEW]: 'Tab' },
   { name: 'Keyboard 2 (arrows)', up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight',
-    [BTN.A]: 'Slash', [BTN.X]: 'Period', [BTN.RB]: 'Comma', [BTN.Y]: 'Quote', [BTN.LB]: 'Semicolon', [BTN.MENU]: 'Backspace', [BTN.VIEW]: 'Backslash' },
+    [BTN.A]: 'Slash', [BTN.B]: 'BracketRight', [BTN.X]: 'Period', [BTN.RB]: 'Comma', [BTN.Y]: 'Quote', [BTN.LB]: 'Semicolon', [BTN.MENU]: 'Backspace', [BTN.VIEW]: 'Backslash' },
 ];
 const down = new Set();
 const used = [false, false];
