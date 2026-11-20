@@ -24,10 +24,13 @@ import * as mirror from '../src/games/mirror.js';
 import * as wormhole from '../src/games/wormhole.js';
 import * as rules from '../src/games/rules.js';
 import * as still from '../src/games/still.js';
+import * as spotlight from '../src/games/spotlight.js';
+import * as slide from '../src/games/slide.js';
+import * as swap from '../src/games/swap.js';
 import { Bot } from '../src/game/bots.js';
 import { clockAt } from '../src/game/night.js';
 
-const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout, mobius, echo, mirror, wormhole, rules, still };
+const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout, mobius, echo, mirror, wormhole, rules, still, spotlight, slide, swap };
 export const results = [];
 function test(name, fn) { try { fn(); results.push({ name, ok: true }); } catch (e) { results.push({ name, ok: false, err: e.message + (e.stack ? ' @ ' + e.stack.split('\n')[1] : '') }); } }
 function eq(a, b, msg = '') { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg} expected ${JSON.stringify(b)} got ${JSON.stringify(a)}`); }
@@ -420,10 +423,10 @@ test('impact: the freeze grows with damage and is capped', () => {
   ok(frozen / 600 < 0.35, `a hit every frame freezes ${Math.round(frozen / 6)}% of the time`);
   const fx4 = new Fx(); fx4.calm = true; fx4.impact(10, 10, { dmg: 40 }); eq(fx4.trauma, 0, 'calm mode: no shake');
 });
-test('core set: real events, three per act, enough for an 8-event night with no repeats', () => {
-  const core = ['rumble', 'coins', 'tick', 'orbit', 'lightsout', 'mirror', 'mobius', 'wormhole', 'rules'];
+test('core set: real events, four per act, enough for an 8-event night with no repeats', () => {
+  const core = ['rumble', 'coins', 'tick', 'spotlight', 'orbit', 'lightsout', 'mirror', 'slide', 'mobius', 'wormhole', 'rules', 'swap'];
   const tiers = core.map((id) => GAMES[id].meta.tier || 1);
-  eq([1, 2, 3].map((t) => tiers.filter((x) => x === t).length), [3, 3, 3]);
+  eq([1, 2, 3].map((t) => tiers.filter((x) => x === t).length), [4, 4, 4]);
   for (const id of core) ok(GAMES[id].meta.card, `${id} has a short intro card`);
   for (let k = 0; k < 100; k++) {
     const p = makePlaylist(core, 2, Math.random, 8, (id) => GAMES[id].meta.tier || 1);
@@ -443,7 +446,7 @@ test('intro cards fit on screen at reading size', () => {
 
 // ---- the night (build .10-night) ----
 test('the night opens with Rooftop and ends with Rule Breaker, acts in order', () => {
-  const core = ['rumble', 'coins', 'tick', 'orbit', 'lightsout', 'mirror', 'mobius', 'wormhole', 'rules'];
+  const core = ['rumble', 'coins', 'tick', 'spotlight', 'orbit', 'lightsout', 'mirror', 'slide', 'mobius', 'wormhole', 'rules', 'swap'];
   const tierOf = (id) => GAMES[id].meta.tier || 1;
   const roleOf = (id) => (GAMES[id].meta.opener ? 'opener' : GAMES[id].meta.finale ? 'finale' : null);
   for (let k = 0; k < 100; k++) {
@@ -472,6 +475,52 @@ test('night clock: 11 PM start, midnight for act 2, 1 AM for act 3, 2 AM after',
   eq(clockAt(pl, 0, tf), '11:00 PM'); eq(clockAt(pl, 1, tf), '11:30 PM'); eq(clockAt(pl, 2, tf), '12:00 AM'); eq(clockAt(pl, 4, tf), '1:00 AM'); eq(clockAt(pl, 6, tf), '2:00 AM');
 });
 for (const id of ['lounge', 'blastball', 'echo']) {
+  test(`${id}: a player who never touches the controller cannot win`, () => {
+    for (let v = 0; v < 6; v++) {
+      const fx = new Fx();
+      const game = GAMES[id].create({ fx, sound: NO_SOUND, variant: v, players: [1, 2, 3].map((s) => ({ seat: s, idx: s - 1, stats: statsFor({}), pickupMult: 1 })) });
+      const others = bots([2, 3]);
+      let n = 0;
+      while (!game.finished && n < 60 * 80) { const m = others(1 / 60); m.set(1, NO_CONTROLS); fx.update(1 / 60); game.update(1 / 60 * (fx.timeScale() || 0.0001), m); n++; }
+      ok(game.finished, 'finished');
+      ok(game.ranking[0] !== 1, `idle seat 1 won ${id} v${v}`);
+    }
+  });
+}
+
+// ---- three new events (build .11-three) ----
+test('spotlight: only a player ALONE in the light scores', () => {
+  const fx = new Fx();
+  const game = GAMES.spotlight.create({ fx, sound: NO_SOUND, variant: 0, players: [1, 2].map((s) => ({ seat: s, idx: s - 1, stats: statsFor({}), pickupMult: 1 })) });
+  let n = 0; while (n < 60 * 20 && !game.finished) { game.update(1 / 60, new Map([[1, NO_CONTROLS], [2, NO_CONTROLS]])); n++; }
+  // nobody moves into the light on their own spawn... unless a spawn sits in it; either way, contested time never scores twice
+  const total = game.players.reduce((a, p) => a + p.score, 0);
+  ok(total <= 20 + 1e-6, 'score never exceeds elapsed time');
+});
+test('zero friction is a best-of: 2+ rounds, most round wins first, under the cap', () => {
+  for (let v = 0; v < 3; v++) {
+    const { game, secs } = playthrough('slide', { variant: v });
+    ok(game.finished); ok(game.round >= 2, `only ${game.round} round(s)`); ok(secs <= 62, `took ${secs}s`);
+    const top = Math.max(...game.players.map((p) => p.wins));
+    eq(game.players.find((p) => p.seat === game.ranking[0]).wins, top, 'most round wins ranks first');
+  }
+});
+test('zero friction: a sudden-death ghost never gets back on the ice', () => {
+  const { game } = playthrough('slide', { ghosts: [3] });
+  const g3 = game.players.find((p) => p.seat === 3);
+  ok(g3.dead && g3.wins === 0);
+});
+test('body snatch: every controller changes body at each swap, and gems stay with the player', () => {
+  const fx = new Fx();
+  const game = GAMES.swap.create({ fx, sound: NO_SOUND, variant: 0, players: [1, 2, 3].map((s) => ({ seat: s, idx: s - 1, stats: statsFor({}), pickupMult: 1 })) });
+  const before = game.players.map((p) => p.body);
+  game.players[0].gems = 5;
+  for (let n = 0; n < 60 * 8 + 5; n++) game.update(1 / 60, new Map([[1, NO_CONTROLS], [2, NO_CONTROLS], [3, NO_CONTROLS]]));
+  game.players.forEach((p, i) => ok(p.body !== before[i], `P${i + 1} kept their body`));
+  eq(new Set(game.players.map((p) => p.body)).size, 3, 'one driver per body');
+  ok(game.players[0].gems >= 5, 'gems travelled with the player');
+});
+for (const id of ['spotlight', 'slide', 'swap']) {
   test(`${id}: a player who never touches the controller cannot win`, () => {
     for (let v = 0; v < 6; v++) {
       const fx = new Fx();

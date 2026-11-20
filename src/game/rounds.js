@@ -10,7 +10,7 @@ export function makeRounds({ players, fx, sound, drift, onReset, win = 2, max = 
     round: 1, roundT: 0, between: 0, endT: null, banner: null, t: 0, win, shield,
     contenders: () => players.filter((p) => !p.perma),
   };
-  for (const p of players) { p.wins = 0; p.survive = 0; p.dealt = 0; p.perma = !!p.perma; }
+  for (const p of players) { p.wins = 0; p.survive = 0; p.dealt = 0; p.dealtTotal = 0; p.perma = !!p.perma; }
 
   R.reset = () => {
     R.roundT = 0;
@@ -39,9 +39,11 @@ export function makeRounds({ players, fx, sound, drift, onReset, win = 2, max = 
 
   function endRound(winner, how) {
     R.between = breakT;
+    for (const p of R.contenders()) p.dealtTotal += p.dealt;
     if (winner && winner.dealt <= 0) { // land a hit to take the round: no prize for hiding
       const fighter = R.contenders().filter((p) => p.dealt > 0).sort((a, b) => b.dealt - a.dealt)[0];
       if (fighter) { how = `P${winner.idx + 1} NEVER LANDED A HIT`; winner = fighter; }
+      else { how = 'NOBODY LANDED A HIT'; winner = null; }
     }
     if (winner) {
       winner.wins += 1;
@@ -69,7 +71,8 @@ export function makeRounds({ players, fx, sound, drift, onReset, win = 2, max = 
   };
 
   R.rank = () => {
-    const order = (x, y) => (y.wins - x.wins) || (y.survive - x.survive) || (y.hp / y.maxHp - x.hp / x.maxHp);
+    // round wins, then who fought (hits landed across the event), then survival: hiding never breaks a tie
+    const order = (x, y) => (y.wins - x.wins) || ((y.dealtTotal + y.dealt) - (x.dealtTotal + x.dealt)) || ((y.recoilAt ? 1 : 0) - (x.recoilAt ? 1 : 0)) || (y.survive - x.survive) || (y.hp / y.maxHp - x.hp / x.maxHp);
     return [...R.contenders().sort(order), ...players.filter((p) => p.perma)].map((p) => p.seat);
   };
   R.leader = () => { const r = R.rank(); return R.contenders().some((p) => p.wins) ? r[0] : null; };

@@ -30,7 +30,9 @@ export function makePlaylist(ids, perGame = 2, rng = Math.random, total = null, 
  * the acts is not. Falls back to other tiers when one runs short.
  */
 export function actPlaylist(ids, rng, total, tierOf, roleOf = null) {
-  const pools = [1, 2, 3].map((k) => shuffle(ids.filter((id) => (tierOf(id) || 1) === k), rng));
+  // an act's opener or finale always makes the cut; the rest of the act is a random draw
+  const role = (id) => (roleOf ? roleOf(id) : null);
+  const pools = [1, 2, 3].map((k) => { const p = shuffle(ids.filter((id) => (tierOf(id) || 1) === k), rng); return [...p.filter(role), ...p.filter((id) => !role(id))]; });
   const want = [Math.round(total * 0.4), Math.round(total * 0.25)];
   want.push(total - want[0] - want[1]);
   const out = [];

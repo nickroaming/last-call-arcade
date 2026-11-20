@@ -15,11 +15,11 @@ import { Bot } from './bots.js';
 import { Drift, P, glyph, prompt } from '../engine/style.js';
 import { ACTS, clockAt, cabinetQuip, drawStage, drawCrt, drawBezel, drawVoice, drawCabinet, drawNightStrip } from './night.js';
 
-export const BUILD = 'm1-2026-11-20.10-night';
+export const BUILD = 'm1-2026-11-20.11-three';
 export { GAMES };
 // The core set: the events that pass the quality bar (docs/PLAYTEST.md, tests/measure.html).
-// Three per act, so every night builds from grounded to mind-bending. ALL EVENTS adds the rest.
-export const CORE = ['rumble', 'coins', 'tick', 'orbit', 'lightsout', 'mirror', 'mobius', 'wormhole', 'rules'];
+// Four per act, so every night builds from grounded to mind-bending. ALL EVENTS adds the rest.
+export const CORE = ['rumble', 'coins', 'tick', 'spotlight', 'orbit', 'lightsout', 'mirror', 'slide', 'mobius', 'wormhole', 'rules', 'swap'];
 const GAME_IDS = Object.keys(GAMES);
 const params = new URLSearchParams(location.search);
 const MIN_PLAYERS = params.has('solo') ? 1 : 2;
@@ -390,7 +390,7 @@ function updateTitle(dt) {
 // One focusable list instead of five shortcut buttons: every setting is
 // visible, explained at reading size, and reachable with the stick or D-pad.
 const OPTS = [
-  { label: 'EVENTS', vals: () => ['CORE 9', 'ALL 16'], get: () => (settings.set === 'all' ? 1 : 0), set: (i) => { settings.set = i ? 'all' : 'core'; save('set', settings.set); }, help: 'CORE: THE 9 MOST POLISHED EVENTS', titleOnly: true },
+  { label: 'EVENTS', vals: () => [`CORE ${CORE.length}`, `ALL ${GAME_IDS.length}`], get: () => (settings.set === 'all' ? 1 : 0), set: (i) => { settings.set = i ? 'all' : 'core'; save('set', settings.set); }, help: `CORE: THE ${CORE.length} MOST POLISHED EVENTS`, titleOnly: true },
   { label: 'TEXT SIZE', vals: () => ['NORMAL', 'LARGE'], get: () => (settings.large ? 1 : 0), set: (i) => { settings.large = !!i; save('large', settings.large); applyLook(); }, help: 'LARGE: BIGGER NAME TAGS AND POP-UPS' },
   { label: 'SCREEN FIT', vals: () => FIT_LEVELS.map((f) => f.name), get: () => settings.fit, set: (i) => { settings.fit = i; save('fit', i); applyLook(); }, help: 'SHRINK IT IF YOUR TV CUTS OFF THE EDGES' },
   { label: 'COLOR LOOK', vals: () => TRIP_LEVELS.map((l) => l.name), get: () => settings.trip, set: (i) => { settings.trip = i; save('look', i); applyLook(); fx.hueKick = TRIP_LEVELS[i].kick; }, help: 'HOW MUCH THE BACKGROUND COLOR DRIFTS' },
@@ -564,7 +564,7 @@ function drawTitle() {
   let fxx = 160 - 150;
   fxx += prompt(g, 'Y', 'OPTIONS', fxx, 161) + 10;
   fxx += prompt(g, 'RT', 'ADD CPU', fxx, 161) + 10;
-  g.text(`${settings.set === 'all' ? 'ALL 16' : 'CORE 9'} EVENTS${settings.calm ? '  CALM' : ''}`, 310, 162, { scale: 2, col: P.dim, align: 'right', shadow: null });
+  g.text(`${settings.set === 'all' ? `ALL ${GAME_IDS.length}` : `CORE ${CORE.length}`} EVENTS${settings.calm ? '  CALM' : ''}`, 310, 162, { scale: 2, col: P.dim, align: 'right', shadow: null });
   const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter((p2) => p2 && p2.connected) : [];
   if (sound.blocked && !settings.muted) g.text('SOUND STARTS AFTER YOUR FIRST BUTTON PRESS', 160, 173, { scale: 1, col: P.warn, align: 'center' });
   else if (!pads.length) g.text('KEYS: WASD MOVE  SPACE=A  F=SHOOT  G=BLOCK  IJKL=AIM  ENTER=START  C=ADD CPU  R=OPTIONS', 160, 173, { scale: 1, col: '#9a90c0', align: 'center' });

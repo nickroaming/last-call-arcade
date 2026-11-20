@@ -162,7 +162,7 @@ The story frame is a design system too:
 | The Cabinet's voice (`drawVoice`) | Its icon plus one line, typed at 32 characters per second with a `type` blip every other character. Max ~40 characters, scale 2, in the act accent or warn yellow. One voice line on screen at a time. |
 | Night strip (`drawNightStrip`) | One slot per event; act accent border; finished slots show the winner's colour; the current slot is framed in white; a thin divider between acts. |
 | Clock (`clockAt`) | 11 PM, midnight and 1 AM start acts 1, 2 and 3; events inside an act share its hour; the recap is 2:00 AM. |
-| Broken rule (`meta.broken`) | Every act 2 and 3 event names one rule in 1–3 words (GRAVITY, LIGHT, YOUR BODY, TIME, UP AND DOWN, THE PAST, SPACE, THE RULES). Act 1 events have none, on purpose: the rules are intact. |
+| Broken rule (`meta.broken`) | Every act 2 and 3 event names one rule in 1–3 words (GRAVITY, LIGHT, YOUR BODY, TIME, FRICTION, UP AND DOWN, THE PAST, SPACE, WHO YOU ARE, THE RULES). Act 1 events have none, on purpose: the rules are intact. |
 
 **Component states:**
 | Component | Base | Focus | Selected / locked | Disabled / waiting | Won | Lost / out | Disconnected |

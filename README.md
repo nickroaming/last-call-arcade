@@ -1,7 +1,7 @@
 # Last Call Arcade
 
 A couch party game for 2-3 players on one Xbox Series X (Edge browser) and one TV.
-Sixteen arcade minigames in three acts; a match plays 8 of them, starting grounded and ending mind-bending. Creative direction and storyboard: [docs/CREATIVE_DIRECTION.md](docs/CREATIVE_DIRECTION.md). Every game shares a ROUNDS-style gun: bullets drop, bounce, split, home in and explode. Losers draft trade-off cards that stack into combos. Winners get the Winner's Curse.
+Nineteen arcade minigames in three acts; a night plays 8 of them, starting grounded and ending mind-bending, narrated by the Cabinet that runs the bar's arcade. Creative direction and storyboard: [docs/CREATIVE_DIRECTION.md](docs/CREATIVE_DIRECTION.md). Every game shares a ROUNDS-style gun: bullets drop, bounce, split, home in and explode. Losers draft trade-off cards that stack into combos. Winners get the Winner's Curse.
 
 - **Play:** https://nickroaming.github.io/last-call-arcade/
 - **Online seat test (remote player):** https://nickroaming.github.io/last-call-arcade/online-test.html · steps in [docs/ONLINE_SEAT_TEST.md](docs/ONLINE_SEAT_TEST.md)
@@ -62,7 +62,7 @@ Tests: http://127.0.0.1:8777/tests/ should say ALL PASS.
 - `src/input/gamepad-adapter.js`: seats, joins, reconnects (shared with the controller test).
 - `src/engine/`: pixel renderer and font, effects (shake, hit-stop, slow-mo, particles), synth sound and music, character art.
 - `src/game/`: match rules (`match.js`), cards, Winner's Curse and pickup buffs (`powers.js`), the shared gun physics (`weapons.js`), twists (`twists.js`), arena power-ups (`pickups.js`), controls, and the game-night flow (`main.js`).
-- `src/games/`: the seven minigames. Each exports `meta` and `create(ctx)` → `{update, draw, hud, finished, ranking}`.
+- `src/games/`: the minigames (19; the shared registry is `src/game/registry.js`). Each exports `meta` and `create(ctx)` → `{update, draw, hud, finished, ranking}`.
 - `tests/`: unit tests and robot playthroughs that run in the browser.
 
 Plain JavaScript modules, no build step, because this Mac has no Node.js. Match logic and minigames don't depend on the page, so moving to TypeScript later stays mechanical.

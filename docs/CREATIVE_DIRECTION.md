@@ -17,9 +17,9 @@ Three friends on one couch and one TV. A night is 8 short events, 5–8 minutes 
 ### The three acts of a night
 | Act | Events | Feel | Games |
 | --- | --- | --- | --- |
-| **1. Warm-up** | first ~40% | Normal physics, learn the gun, trash talk | Ricochet Rooftop, Dust Lap, Laser Lounge, Coin Storm, Blast Ball, Splat City, Tick Tock, Updraft |
-| **2. The machine wakes** | next ~25% | One rule is off: gravity, light, mirrors, time | Orbit Outpost, Lights Out, Mirror Twins, Still Life |
-| **3. Last call** | final events | Space and logic break | Mobius Loop, Echo Chamber, Wormhole, Rule Breaker |
+| **1. Warm-up** | first ~40% | Normal physics, learn the gun, trash talk | Ricochet Rooftop, Dust Lap, Laser Lounge, Coin Storm, Blast Ball, Splat City, Tick Tock, Updraft, **Spotlight** |
+| **2. The machine wakes** | next ~25% | One rule is off: gravity, light, mirrors, time, friction | Orbit Outpost, Lights Out, Mirror Twins, Still Life, **Zero Friction** |
+| **3. Last call** | final events | Space, logic and identity break | Mobius Loop, Echo Chamber, Wormhole, Rule Breaker, **Body Snatch** |
 
 **Built:** each game has a `tier` (1, 2 or 3), and the playlist deals events in act order. You always start grounded and finish in the weird stuff, but which games show up still changes every night.
 
@@ -149,5 +149,16 @@ Chiptune themes per game family. The SFX vocabulary stays consistent everywhere:
 - deadpan, never a joke at a player's expense beyond the game
 
 The icon is the faceless Cabinet.
+
+## 11. Three more events (build `m1-2026-11-20.11-three`)
+One per act. Each was designed against the six pillars and measured before it shipped.
+
+| Event | Act | The one broken rule | Teach beat | The turn | Fairness rule |
+| --- | --- | --- | --- | --- | --- |
+| **Spotlight** | 1 | none: the rules are intact. It's a crowd game: stand in the light **alone** to score | The first light never lands on a spawn point | 30 s: the ENCORE, a smaller light that moves every 6 s | Two in the light scores nobody. Standing still in the light for 2 s gets booed (no score). Ties go to who shoved more |
+| **Zero Friction** | 2 | **FRICTION**: you keep every bit of speed; the only brake is shooting the other way | 1 s spawn shield in the middle of a full-size rink | Each round: pucks at 5 s, the rim melts inward from 8 s | Best-of rounds with land-a-hit; knocking someone in counts as a hit. Over the edge you wobble for 0.7 s and can push back in |
+| **Body Snatch** | 3 | **WHO YOU ARE**: every 8 s every controller jumps to the next body | A 2 s warning with arrows from your ring to your next body before every swap | 25 s: swaps every 5 s, sometimes in reverse order | Gems belong to the player, not the body, so you can't sit still and inherit someone's work |
+
+**Why these three:** each adds a verb the night didn't have. Act 1 gets a social, read-the-room game (contesting a space). Act 2 gets pure momentum. Act 3 gets the most personal break yet: after space and logic, the Cabinet takes your body. The recap now reads, for example, "...BROKE FRICTION... BROKE SPACE... BROKE WHO YOU ARE... BROKE THE RULES".
 
 **Sources:** [Portal post-mortem (GDC 2008)](https://cdn.fastly.steamstatic.com/apps/valve/2008/GDC2008_PortalPostMortem.pdf) · [Kim Swift on design lessons](https://gamedeveloper.com/design/10-years-of-design-lessons-from-em-portal-em-s-kim-swift) · [Portal developer commentary](https://theportalwiki.com/wiki/Portal_developer_commentary) · [Designing Baba Is You's rule system](https://www.gamedeveloper.com/design/designing-i-baba-is-you-i-s-delightfully-innovative-rule-writing-system) · [Baba Is You (Wikipedia)](https://en.wikipedia.org/wiki/Baba_Is_You) · [Superhot's origin](https://www.gamedeveloper.com/disciplines/the-origin-and-future-of-frozen-time-fps-hit-superhot-and-the-positive-crunching-behind-it)

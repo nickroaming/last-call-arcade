@@ -16,5 +16,8 @@ import * as mirror from '../games/mirror.js';
 import * as wormhole from '../games/wormhole.js';
 import * as rules from '../games/rules.js';
 import * as still from '../games/still.js';
+import * as spotlight from '../games/spotlight.js';
+import * as slide from '../games/slide.js';
+import * as swap from '../games/swap.js';
 
-export const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout, mobius, echo, mirror, wormhole, rules, still };
+export const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout, mobius, echo, mirror, wormhole, rules, still, spotlight, slide, swap };

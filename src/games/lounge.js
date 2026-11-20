@@ -231,7 +231,7 @@ export function create(ctx) {
     }
     // the floor heats up under anyone who stops dancing: 2.2 s within a few pixels arms the tiles around them
     for (const p of alive()) {
-      if (!p.anchor || Math.hypot(p.x - p.anchor[0], p.y - p.anchor[1]) > 12) { p.anchor = [p.x, p.y]; p.stillT = 0; continue; }
+      if (!p.anchor || Math.hypot(p.x - p.anchor[0], p.y - p.anchor[1]) > 12) { if (p.anchor) p.travel = (p.travel || 0) + Math.hypot(p.x - p.anchor[0], p.y - p.anchor[1]); p.anchor = [p.x, p.y]; p.stillT = 0; continue; }
       p.stillT += dt;
       if (p.stillT > 2.2 && t > 2) {
         p.stillT = -1.2;
@@ -267,7 +267,10 @@ export function create(ctx) {
   function rank() {
     const a = players.filter((p) => !p.out).sort((x, y) => y.hearts - x.hearts);
     const d = players.filter((p) => p.out).sort((x, y) => y.outT - x.outT);
-    return [...a, ...d].map((p) => p.seat);
+    // last one DANCING wins: a survivor who barely moved all event ranks below everyone who played
+    const all = [...a, ...d];
+    const danced = all.filter((p) => (p.travel || 0) > 60 || p.outT === -1), idle = all.filter((p) => !((p.travel || 0) > 60 || p.outT === -1));
+    return [...danced, ...idle].map((p) => p.seat);
   }
   game.hud = (seat) => {
     const p = players.find((x) => x.seat === seat);

@@ -1,7 +1,27 @@
 # Playtest and backlog
 
-**Latest build:** `m1-2026-11-20.10-night` (branch `quality/facelift`, not published). **Before that:** `m1-2026-11-20.9-core` (branch `quality/core-pass`), `m1-2026-11-20.8-polish` (live on the Xbox link). The rooftop slice below is compared against `m1-2026-11-20.7`, kept playable in `before/`.
+**Latest build:** `m1-2026-11-20.11-three` (branch `events/three-more`, not published). **Live on the Xbox link:** `m1-2026-11-20.10-night`. **Before that:** `m1-2026-11-20.9-core` (branch `quality/core-pass`), `m1-2026-11-20.8-polish` (live on the Xbox link). The rooftop slice below is compared against `m1-2026-11-20.7`, kept playable in `before/`.
 **Date:** 2026-11-20. **Environment for everything below:** Chromium browser pane on macOS, keyboard P1 + CPU P2/P3. **Nothing here was run on the Series X.**
+
+## Three more events (`m1-2026-11-20.11-three`)
+| Event | Act | Length (CPU, 12-20 runs) | Idle wins | Notes |
+| --- | --- | --- | --- | --- |
+| Spotlight (`spotlight.js`) | 1 | 56 s | 0% | 3 stages (Main Stage, The Bar Top, Balcony). Falling lamps target the star |
+| Zero Friction (`slide.js`) | 2 | 53 s, 2.4 rounds | 0% | 3 rinks (The Rink, Cracked, Twin Holes). Uses `rounds.js` |
+| Body Snatch (`swap.js`) | 3 | 55 s | 0% | 3 rooms (The Lounge, Hall of Mirrors, Open Floor) |
+
+All three are in the core set, which is now **12: four per act**. A full night with three CPUs ran Rooftop → Tick Tock → Coin Storm → Zero Friction → Lights Out → Wormhole → Body Snatch → Rule Breaker in 7.75 min with no errors.
+
+**Rule changes found while building:**
+- **Zero Friction tuning.** It first ran at 17.5 s, then 11.8 s after weakening the shove: the CPU players slid off on their own. The fix that worked is a design beat, not a number: over the edge you **wobble for 0.7 s** and can push back in ("SAVED!"). Result: 44–53 s, 2.4–2.5 rounds.
+- **Shared rounds (`rounds.js`), affects Orbit and Mobius too.** If nobody landed a hit, nobody takes the round ("NOBODY LANDED A HIT"). The final tiebreak is now round wins > hits landed across the event > played at all > survival.
+- **Night order.** With four act 1 events, an opener could be dealt out of the night. Openers and finales now always make the cut.
+- **Laser Lounge.** A survivor who barely moved all event ranks below everyone who played.
+
+**Series X checks for these:**
+1. Spotlight: does "CONTESTED" read instantly? Is the boo rule clear the first time?
+2. Zero Friction: does shooting backwards to brake click without being told? Do the wobble saves feel fair?
+3. Body Snatch: after the first swap, can each of you find yourself within a second? This is the hardest read in the game.
 
 ## The night (`m1-2026-11-20.10-night`), by finding
 | Finding | What changed | Files |
@@ -91,7 +111,8 @@
 ## Tests and results
 | Check | How | Result |
 | --- | --- | --- |
-| Unit and robot suite | `/tests/` (130 tests: every game, twist, card stack, 2-player, CPU bots, drawing) | **130/130 pass** (night build) |
+| Unit and robot suite | `/tests/` (149 tests: every game, twist, card stack, 2-player, CPU bots, drawing) | **149/149 pass** (three-events build) |
+| New-event tests | Spotlight never scores more than elapsed time; Zero Friction is a best-of (2+ rounds, most wins first, ≤ 62 s) and its ghosts stay out; Body Snatch moves every controller to a new body at each swap and gems travel with the player; an idle seat never wins any of the three (6 variants each); core set is 4 per act | pass |
 | Night tests | opener/finale order and acts in order (100 playlists); every act 2/3 event names a broken rule and act 1 events don't; all 16 events have a card; winners recorded per event; clock 11 PM → 2 AM; an idle seat never wins Lounge, Blast Ball or Echo (6 variants each); a hit every frame freezes < 35% of the time | pass |
 | Core-pass tests | Orbit and Mobius best-of (2+ rounds, most wins first, ≤ 62 s, round pips); their sudden-death ghosts never respawn; all three Orbit arenas run; Wormhole's idle player can't win a tie; impact freeze grows with damage and is capped, no shake in Calm Mode; core set has 3 per act, cards, no repeats; every intro card fits at reading size | pass |
 | Core night, normal entry | 3 CPUs, title → podium, default options | ✔ 6.8 min, acts in order, no errors |

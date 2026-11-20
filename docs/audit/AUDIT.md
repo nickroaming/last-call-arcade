@@ -141,6 +141,17 @@ Goal from the brief: a facelift for the whole game, the audit's open items, and 
 
 **[A]** Dust Lap's 25% is likely the CPU driver crashing more than an idle car sitting still; it needs a human race to judge. Lounge, Echo and Updraft are still short with CPUs.
 
+### Pass 5: three new events (build `m1-2026-11-20.11-three`, branch `events/three-more`, 2026-11-20)
+Built to the bar from the start: a short card, a broken rule (acts 2 and 3), the feel kit, the layer palette, ≥ 20 s and idle wins ≤ 15% in `measure.html`. Results: Spotlight 56 s / 0%, Zero Friction 53 s / 0%, Body Snatch 55 s / 0%. Design notes and the tuning record are in [PLAYTEST.md](../PLAYTEST.md#three-more-events-m1-2026-11-2011-three).
+
+| ID | Scene | Finding | Change | Status |
+| --- | --- | --- | --- | --- |
+| **F-29** | Zero Friction | **[O]** CPU players slide off on their own, so rounds lasted ~5 s | Edge wobble (0.7 s save window); CPU steers against its slide | Shipped |
+| **F-30** | Rounds (Orbit, Mobius, Zero Friction) | **[O]** If nobody landed a hit, the round still went to a survivor; the final tie went to whoever survived longest | No hit: nobody takes the round. Tiebreak: wins > hits landed > played > survival | Shipped |
+| **F-31** | Body Snatch | **[O]** "SWAP IN" sat inside the arena and was covered when bodies were near the top | The swap clock owns a strip under the HUD; the arena starts below it | Shipped |
+| **F-32** | Spotlight | **[O]** An idle player could win if the light started on their spawn | First light never on a spawn; standing still in the light for 2 s gets booed | Shipped |
+| **[A]** | Body Snatch | Finding yourself after a swap is the hardest read in the game. The ring, tag, arrows and "P1: BLOOP" popup help on a laptop; the TV test decides | — | Open |
+
 ### Matched before / after
 | Screen | Sheet | What to look at |
 | --- | --- | --- |
