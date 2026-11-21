@@ -1,7 +1,15 @@
 # Playtest and backlog
 
-**Latest build:** `m1-2026-11-20.11-three` (branch `events/three-more`, not published). **Live on the Xbox link:** `m1-2026-11-20.10-night`. **Before that:** `m1-2026-11-20.9-core` (branch `quality/core-pass`), `m1-2026-11-20.8-polish` (live on the Xbox link). The rooftop slice below is compared against `m1-2026-11-20.7`, kept playable in `before/`.
+**Latest build:** `m1-2026-11-20.12-switch` (branch `switch-controllers`, not published). **Live on the Xbox link:** `m1-2026-11-20.11-three`. **Before that:** `m1-2026-11-20.9-core` (branch `quality/core-pass`), `m1-2026-11-20.8-polish` (live on the Xbox link). The rooftop slice below is compared against `m1-2026-11-20.7`, kept playable in `before/`.
 **Date:** 2026-11-20. **Environment for everything below:** Chromium browser pane on macOS, keyboard P1 + CPU P2/P3. **Nothing here was run on the Series X.**
+
+## Switch controllers (`m1-2026-11-20.12-switch`)
+The Switch and Switch 2 have no browser you can open (only a hidden one Nintendo keeps locking down), so the game cannot run on the console. What works: Switch controllers on a computer plugged into the TV, in Chrome or Edge.
+- **Pairing (Mac):** hold the small sync button on the controller until the lights run, then pick it in System Settings > Bluetooth. A Joy-Con pair shows up as one player; a single Joy-Con held sideways is one player too.
+- **Joining:** press the **A printed on the controller**. The game learns from that press which way the browser reports A and B, so A is always A afterwards (tests: Chrome-style and Safari-style reports, and a reconnect).
+- **Lone Joy-Con:** one stick moves and aims (aim follows movement), SL/SR block, the face buttons do the rest, and either minus or plus pauses.
+- **On screen:** when most players hold Switch controllers, prompts show L/R, ZL/ZR, -/+ and grey face buttons. Mixed groups follow the majority; OPTIONS > BUTTONS forces XBOX or SWITCH.
+- **Checked:** simulated Pro Controller + lone Joy-Con: join, labels, move, shoot, pause (`switch_*` captures). **Not checked:** real Joy-Cons. Browsers report Joy-Cons differently; if a stick is turned 90° or a button is wrong, note which controller and browser.
 
 ## Three more events (`m1-2026-11-20.11-three`)
 | Event | Act | Length (CPU, 12-20 runs) | Idle wins | Notes |

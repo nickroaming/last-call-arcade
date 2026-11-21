@@ -12,10 +12,10 @@ import { POWER_BY_ID, RARITY, cardWhere, cardLines, TIPSY_NAMES, TIPSY_LINES, pi
 import { TWISTS } from './twists.js';
 import { GAMES } from './registry.js';
 import { Bot } from './bots.js';
-import { Drift, P, glyph, prompt } from '../engine/style.js';
+import { Drift, P, glyph, prompt, setPadStyle } from '../engine/style.js';
 import { ACTS, clockAt, cabinetQuip, drawStage, drawCrt, drawBezel, drawVoice, drawCabinet, drawNightStrip } from './night.js';
 
-export const BUILD = 'm1-2026-11-20.11-three';
+export const BUILD = 'm1-2026-11-20.12-switch';
 export { GAMES };
 // The core set: the events that pass the quality bar (docs/PLAYTEST.md, tests/measure.html).
 // Four per act, so every night builds from grounded to mind-bending. ALL EVENTS adds the rest.
@@ -62,9 +62,22 @@ function load(key, def) { try { const v = localStorage.getItem('lca.' + key); re
 function save(key, v) { try { localStorage.setItem('lca.' + key, JSON.stringify(v)); } catch (e) { /* ignore */ } }
 const FIT_LEVELS = [{ name: '100%', k: 1 }, { name: '95%', k: 0.95 }, { name: '90%', k: 0.9 }];
 const MUSIC_LEVELS = [{ name: '100%', v: 1 }, { name: '50%', v: 0.5 }, { name: 'OFF', v: 0 }];
+// Button names on screen: Xbox (A B X Y, LB RB, LT RT) or Switch (L R, ZL ZR).
+// AUTO follows whoever is playing: the family most seats hold, Xbox on a tie;
+// before anyone joins, the controllers that are switched on.
+const PAD_STYLES = [{ name: 'AUTO' }, { name: 'XBOX', style: 'xbox' }, { name: 'SWITCH', style: 'nintendo' }];
+function pickPadStyle() {
+  const fixed = (PAD_STYLES[settings.pads] || PAD_STYLES[0]).style;
+  if (fixed) { setPadStyle(fixed); return; }
+  const human = (id) => !/^Keyboard|^CPU/.test(id || '');
+  const seated = input.seats.filter((s) => s.active && human(s.padId)).map((s) => s.kind);
+  const kinds = seated.length ? seated : input.pads.filter((p) => human(p.id)).map((p) => p.kind);
+  const nin = kinds.filter((k) => k === 'nintendo' || k === 'joycon').length;
+  setPadStyle(nin > kinds.length - nin ? 'nintendo' : 'xbox');
+}
 const settings = {
   shake: load('shake', 0), muted: load('muted', false), house: load('house', false), trip: load('look', 0), calm: load('calm', false),
-  set: load('set', 'core'), large: load('large', false), fit: load('fit', 0), music: load('music', 0),
+  set: load('set', 'core'), large: load('large', false), fit: load('fit', 0), music: load('music', 0), pads: load('pads', 0),
   prompts: params.get('rules') ? params.get('rules').split('|').map((s) => s.trim()).filter(Boolean).slice(0, 12) : DEFAULT_PROMPTS,
 };
 sound.setMuted(settings.muted);
@@ -77,6 +90,7 @@ function applyLook() {
   if (!MUSIC_LEVELS[settings.music]) settings.music = 0;
   sound.setMusicVol(MUSIC_LEVELS[settings.music].v);
   if (!FIT_LEVELS[settings.fit]) settings.fit = 0;
+  if (!PAD_STYLES[settings.pads]) settings.pads = 0;
   fit();
 }
 applyLook();
@@ -259,6 +273,7 @@ function update(dt) {
   st.wipe = Math.max(0, st.wipe - dt);
   runBots(dt);
   const events = input.update(performance.now());
+  pickPadStyle();
   if (events.some((e) => e.type === 'press' || e.type === 'join')) sound.ensure();
   for (const e of events) {
     if (e.type === 'join') { sound.sfx('join'); fx.burst(60 + (e.seat - 1) * 100, 120, 20, SEAT_COLORS[e.seat - 1], { speed: 90, life: 0.6 }); }
@@ -399,6 +414,7 @@ const OPTS = [
   { label: 'SOUND', vals: () => ['ON', 'OFF'], get: () => (settings.muted ? 1 : 0), set: (i) => { settings.muted = !!i; sound.setMuted(settings.muted); save('muted', settings.muted); }, help: 'ALL SOUND ON OR OFF' },
   { label: 'MUSIC', vals: () => MUSIC_LEVELS.map((m) => m.name), get: () => settings.music, set: (i) => { settings.music = i; save('music', i); applyLook(); }, help: 'MUSIC VOLUME. SOUND EFFECTS STAY' },
   { label: 'HOUSE RULES', vals: () => ['OFF', 'ON'], get: () => (settings.house ? 1 : 0), set: (i) => { settings.house = !!i; save('house', settings.house); }, help: 'PROMPTS BETWEEN EVENTS. SCORES NEVER CHANGE', titleOnly: true },
+  { label: 'BUTTONS', vals: () => PAD_STYLES.map((p) => p.name), get: () => settings.pads, set: (i) => { settings.pads = i; save('pads', i); pickPadStyle(); }, help: 'AUTO: BUTTON NAMES MATCH YOUR CONTROLLERS' },
   { label: 'DONE', action: true, help: 'BACK TO THE GAME' },
 ];
 function openOptions(from) { st.opts = { cur: 0, from, t: 0 }; sound.sfx('move'); }
@@ -430,9 +446,10 @@ function drawOptions() {
   g.alpha(0.95); g.rect(0, 0, 320, 180, '#07060c', true); g.alpha(1);
   g.text('OPTIONS', 160, 5, { scale: 3, col: P.warn, align: 'center' });
   OPTS.forEach((row, k) => {
-    const y = 22 + k * 12.4;
+    const step = Math.min(12.4, 116 / (OPTS.length - 1)); // rows tighten as options are added, help stays clear
+    const y = 21 + k * step;
     const focus = o.cur === k, locked = optLocked(row);
-    if (focus) { g.rect(30, y - 2, 260, 11, P.panelHi, true); g.frame(30, y - 2, 260, 11, P.warn, 1, true); g.text('>', 24, y, { scale: 2, col: P.warn }); }
+    if (focus) { g.rect(30, y - 1.5, 260, 10.5, P.panelHi, true); g.frame(30, y - 1.5, 260, 10.5, P.warn, 1, true); g.text('>', 24, y, { scale: 2, col: P.warn }); }
     g.text(row.label, 36, y, { scale: 2, col: locked ? '#5a5280' : focus ? P.text : P.dim, shadow: null });
     if (row.action) return;
     const v = row.vals()[row.get()];

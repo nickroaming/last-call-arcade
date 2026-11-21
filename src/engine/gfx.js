@@ -1,6 +1,7 @@
 // Pixel renderer. The world is 320×180. The canvas is 640×360, so text can
 // use half-pixels for small print. Everything stays nearest-neighbour.
 import { drawText, textWidth, wrap } from './font.js';
+import { btnText } from './style.js';
 
 export const W = 320;
 export const H = 180;
@@ -83,7 +84,8 @@ export class Gfx {
    * Text. x,y are world pixels; scale is canvas pixels per font pixel
    * (1 = small print, 2 = normal, 3+ = headline).
    */
-  text(str, x, y, { scale = 2, col = '#fff', align = 'left', shadow = '#000', ui = true } = {}) {
+  text(str, x, y, { scale = 2, col = '#fff', align = 'left', shadow = '#000', ui = true, raw = false } = {}) {
+    if (!raw) str = btnText(str);
     const w = textWidth(str, scale) / S;
     let tx = x;
     if (align === 'center') tx = x - w / 2;
@@ -94,7 +96,7 @@ export class Gfx {
     drawText(this.c, str, cx, cy, scale, col);
     return w;
   }
-  textW(str, scale = 2) { return textWidth(str, scale) / S; }
+  textW(str, scale = 2) { return textWidth(btnText(str), scale) / S; }
   lineH(scale = 2) { return (8 * scale) / S; }
   /** Wrapped paragraph; returns height used. */
   para(str, x, y, maxW, opts = {}) {

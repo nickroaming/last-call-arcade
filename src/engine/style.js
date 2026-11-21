@@ -83,16 +83,33 @@ export class Drift {
 // Face buttons are round, in their Xbox colour, with the letter: colour plus
 // position plus letter, so they read even without colour. Bumpers and triggers
 // are pills; the stick is a ring.
+// On Switch controllers the face buttons are all one colour, the bumpers
+// are L/R, the triggers ZL/ZR and the menu buttons minus/plus. The letters
+// A/B/X/Y match the controller (the input adapter learns the layout).
 const FACE = { A: '#5fc83a', B: '#e8443a', X: '#2f8ae6', Y: '#f2c21b' };
+const NINTENDO_NAMES = { LB: 'L', RB: 'R', LT: 'ZL', RT: 'ZR', View: '-', VIEW: '-', Menu: '+', MENU: '+' };
+let padStyle = 'xbox';
+/** 'xbox' | 'nintendo': which controller family the on-screen prompts show. */
+export function setPadStyle(style) { padStyle = style === 'nintendo' ? 'nintendo' : 'xbox'; }
+export function getPadStyle() { return padStyle; }
+/** A button name as this controller family prints it. */
+export function btnName(label) { return padStyle === 'nintendo' && NINTENDO_NAMES[label] ? NINTENDO_NAMES[label] : label; }
+/** Rewrite button names inside a sentence ("Your block (RB)" -> "Your block (R)"). */
+export function btnText(str) {
+  if (padStyle !== 'nintendo' || typeof str !== 'string') return str;
+  return str.replace(/\b(LB|RB|LT|RT)\b/g, (m) => NINTENDO_NAMES[m]);
+}
 export function glyph(g, label, x, y, scale = 2) {
+  label = btnName(label);
   const u = scale / 2;               // world px per font px
   const h = 8 * u + 2;               // glyph height in world px
   const c = g.c;
   if (FACE[label]) {
     const r = h / 2;
-    g.circle(x + r, y + r - 1, r, FACE[label], true);
-    g.ring(x + r, y + r - 1, r, P.ink, true);
-    g.text(label, x + r + 0.5, y + r - 1 - 3.5 * u, { scale, col: label === 'Y' ? P.ink : '#ffffff', align: 'center', shadow: null });
+    const nin = padStyle === 'nintendo';
+    g.circle(x + r, y + r - 1, r, nin ? '#3a3a44' : FACE[label], true);
+    g.ring(x + r, y + r - 1, r, nin ? '#c8c8d0' : P.ink, true);
+    g.text(label, x + r + 0.5, y + r - 1 - 3.5 * u, { scale, col: !nin && label === 'Y' ? P.ink : '#ffffff', align: 'center', shadow: null, raw: true });
     return h + 1;
   }
   if (label === 'STICK' || label === 'L-STICK' || label === 'R-STICK') {
@@ -104,13 +121,13 @@ export function glyph(g, label, x, y, scale = 2) {
   const w = g.textW(label, scale) + 6;
   g.rect(x, y - 1, w, h, '#2a2640', true);
   g.frame(x, y - 1, w, h, P.text, 1, true);
-  g.text(label, x + 3, y - 1 + (h - 7 * u) / 2, { scale, col: P.text, shadow: null });
+  g.text(label, x + 3, y - 1 + (h - 7 * u) / 2, { scale, col: P.text, shadow: null, raw: true });
   void c;
   return w + 1;
 }
 /** Draw a prompt like [A] READY. Returns total width. */
 export function prompt(g, label, text, x, y, { scale = 2, col = P.text, align = 'left' } = {}) {
-  const parts = label.split('/').map((s) => s.trim());
+  const parts = label.split('/').map((s) => btnName(s.trim()));
   const textW = g.textW(text, scale);
   let w = 0;
   for (const p of parts) w += (FACE[p] ? 8 * scale / 2 + 3 : g.textW(p, scale) + 7) + 2;

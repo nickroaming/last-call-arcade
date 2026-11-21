@@ -12,7 +12,36 @@ export const BUTTON_NAMES = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'View',
 const NB = 17;
 const PRESS_THRESHOLD = 0.5;
 
-function readPad(gp) {
+/**
+ * Which family a controller belongs to, from the browser's id string.
+ * 'joycon' is one Joy-Con on its own (held sideways: one stick, no triggers).
+ * Chrome:  "Joy-Con (L) (STANDARD GAMEPAD Vendor: 057e Product: 2006)"
+ *          "Joy-Con L+R (STANDARD GAMEPAD Vendor: 057e Product: 200e)"
+ * Firefox: "057e-2009-Pro Controller"   Safari: "Pro Controller", "Joy-Con (L)"
+ */
+export function padKind(id = '') {
+  if (/joy-?con/i.test(id) && /\((L|R)\)/i.test(id) && !/L\s*\+\s*R|\(L\/R\)/i.test(id)) return 'joycon';
+  if (/057e|nintendo|joy-?con|pro controller|switch/i.test(id)) return 'nintendo';
+  return 'xbox';
+}
+const isNintendo = (kind) => kind === 'nintendo' || kind === 'joycon';
+
+/**
+ * Nintendo puts A on the right and B at the bottom. Browsers disagree on
+ * whether the "standard" layout follows position (Chrome) or the printed
+ * letter (some Safari versions), so we learn it when the player joins:
+ * the prompt says "press A", and whichever of the two right/bottom buttons
+ * they press is their A. If it was the right one we swap A/B and X/Y, so the
+ * letter printed on the controller is the letter the game shows.
+ */
+function swapFace(arr) {
+  const a = arr.slice();
+  [a[0], a[1]] = [arr[1], arr[0]];
+  [a[2], a[3]] = [arr[3], arr[2]];
+  return a;
+}
+
+function readPad(gp, swap = false, kind = 'xbox') {
   const buttons = new Array(NB).fill(false);
   const values = new Array(NB).fill(0);
   for (let i = 0; i < NB; i++) {
@@ -23,7 +52,14 @@ function readPad(gp) {
     buttons[i] = (typeof b === 'object' && b.pressed) || v > PRESS_THRESHOLD;
   }
   const axes = [0, 1, 2, 3].map((i) => (gp.axes && gp.axes[i]) || 0);
-  return { buttons, values, axes };
+  if (kind === 'joycon') {
+    // A lone Joy-Con has only one of minus/plus: either one opens the menu.
+    // Its single stick is the move stick; there is no aim stick to read.
+    buttons[BTN.MENU] = buttons[BTN.MENU] || buttons[BTN.VIEW];
+    axes[2] = 0; axes[3] = 0;
+  }
+  if (!swap) return { buttons, values, axes };
+  return { buttons: swapFace(buttons), values: swapFace(values), axes };
 }
 
 export class Seat {
@@ -37,6 +73,8 @@ export class Seat {
     this.padIndex = null;
     this.padId = '';
     this.mapping = '';
+    /** 'xbox' | 'nintendo' | 'joycon' (see padKind) */
+    this.kind = 'xbox';
     this.buttons = new Array(NB).fill(false);
     this.values = new Array(NB).fill(0);
     this.axes = [0, 0, 0, 0];
@@ -81,6 +119,8 @@ export class InputAdapter {
     this.prev = new Map(); // padIndex -> buttons[] from last frame
     /** Diagnostics: every connected pad this frame. */
     this.pads = [];
+    /** Learned A/B layout per controller: "index|id" -> swap? */
+    this.calib = new Map();
   }
 
   ownerOf(padIndex) {
@@ -115,7 +155,9 @@ export class InputAdapter {
     // 2. Read every pad and work out button edges.
     const reads = new Map();
     for (const [idx, gp] of live) {
-      const r = readPad(gp);
+      const kind = padKind(gp.id);
+      const r = readPad(gp, !!this.calib.get(`${idx}|${gp.id}`), kind);
+      r.kind = kind;
       const prev = this.prev.get(idx) || new Array(NB).fill(false);
       r.just = r.buttons.map((b, i) => b && !prev[i]);
       r.gp = gp;
@@ -128,6 +170,7 @@ export class InputAdapter {
       seat.padIndex = r.gp.index;
       seat.padId = r.gp.id;
       seat.mapping = r.gp.mapping || '';
+      seat.kind = r.kind;
       seat.reconnects += 1;
       seat.fresh = true;
       events.push({ type: 'rejoin', seat: seat.n, padIndex: r.gp.index, how });
@@ -142,7 +185,16 @@ export class InputAdapter {
 
     // 4. A pressed on a controller that owns no seat.
     for (const [idx, r] of reads) {
-      if (this.ownerOf(idx) || !r.just[BTN.A]) continue;
+      if (this.ownerOf(idx)) continue;
+      const key = `${idx}|${r.gp.id}`;
+      if (isNintendo(r.kind) && !this.calib.has(key) && r.just[BTN.B] && !r.just[BTN.A]) {
+        // A Nintendo A press that the browser reports by position: learn it.
+        this.calib.set(key, true);
+        for (const k of ['buttons', 'values', 'just']) r[k] = swapFace(r[k]);
+        this.prev.set(idx, r.buttons);
+      }
+      if (!r.just[BTN.A]) continue;
+      if (isNintendo(r.kind) && !this.calib.has(key)) this.calib.set(key, false);
       const waiting = this.seats.filter((s) => s.state === 'disconnected')
         .sort((a, b) => a.disconnectedAt - b.disconnectedAt)[0];
       if (waiting) { restore(waiting, r, 'press-a'); continue; }
@@ -152,6 +204,7 @@ export class InputAdapter {
         empty.padIndex = idx;
         empty.padId = r.gp.id;
         empty.mapping = r.gp.mapping || '';
+        empty.kind = r.kind;
         empty.joinedAt = now;
         empty.fresh = true;
         events.push({ type: 'join', seat: empty.n, padIndex: idx });
@@ -174,7 +227,7 @@ export class InputAdapter {
     }
 
     this.pads = [...reads].map(([idx, r]) => ({
-      index: idx, id: r.gp.id, mapping: r.gp.mapping || '',
+      index: idx, id: r.gp.id, mapping: r.gp.mapping || '', kind: r.kind,
       seat: (this.ownerOf(idx) || {}).n || null,
       anyHeld: r.buttons.some(Boolean),
     }));

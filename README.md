@@ -41,6 +41,9 @@ Nineteen arcade minigames in three acts; a night plays 8 of them, starting groun
 
 Handy link options: `?events=4` for a short match, `?only=orbit` to practise one game, `?twist=moon` to force a twist, `?solo` to start with one player, `?rules=Toast the winner|Snack break` for your own House Rules prompts.
 
+## Switch controllers
+The Switch has no usable browser, so play on a computer hooked to the TV and pair Switch controllers over Bluetooth (Chrome or Edge). Pro Controllers, Joy-Con pairs and single sideways Joy-Cons each seat one player. Press the A printed on the controller to join; prompts switch to Switch names (L/R, ZL/ZR, -/+) automatically, or set OPTIONS > BUTTONS. Details: [docs/PLAYTEST.md](docs/PLAYTEST.md).
+
 ## Playing without a controller (office mode)
 Open the link in any desktop browser (Chrome, Edge or Safari):
 1. Press **Space** to join as P1 on the keyboard.

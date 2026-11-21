@@ -1,6 +1,8 @@
 // Unit tests for the input adapter and the Milestone 0 pass criteria.
 // Run: serve the project folder, open /tests/ in a browser. No install needed.
-import { InputAdapter, BTN } from '../src/input/gamepad-adapter.js';
+import { InputAdapter, BTN, padKind } from '../src/input/gamepad-adapter.js';
+import { setPadStyle, btnText, btnName } from '../src/engine/style.js';
+import { readControls } from '../src/game/controls.js';
 import { results as gameResults } from './game-tests.js';
 import { TestRun, ReconnectCheck, verdict, TEST_MS } from '../src/controller-test/test-run.js';
 
@@ -244,6 +246,78 @@ test('reconnect times out', () => {
 test('verdict', () => {
   eq(verdict([{ pass: true }, { pass: true }]), 'PASS');
   eq(verdict([{ pass: true }, { pass: false }]), 'FAIL');
+});
+
+// ---- Switch controllers ----
+const PRO = 'Pro Controller (STANDARD GAMEPAD Vendor: 057e Product: 2009)';
+const JCL = 'Joy-Con (L) (STANDARD GAMEPAD Vendor: 057e Product: 2006)';
+test('controller family comes from the id string', () => {
+  eq(padKind(XID), 'xbox');
+  eq(padKind(PRO), 'nintendo');
+  eq(padKind('057e-2009-Pro Controller'), 'nintendo');
+  eq(padKind(JCL), 'joycon');
+  eq(padKind('Joy-Con (R)'), 'joycon');
+  eq(padKind('Joy-Con L+R (STANDARD GAMEPAD Vendor: 057e Product: 200e)'), 'nintendo');
+  eq(padKind('Joy-Con 2 (L)'), 'joycon');
+});
+test('Switch A reported by position (right button) joins, and from then on reads as A', () => {
+  const r = rig();
+  r.slots[0] = pad(0, PRO);
+  const ev = r.tap(r.slots[0], 1);          // Nintendo A sits on the right: index 1 in Chrome
+  ok(ev.some((e) => e.type === 'join'), 'right-button A should join a Nintendo pad');
+  const s = r.adapter.seats[0];
+  eq(s.kind, 'nintendo');
+  ok(!s.pressed(BTN.A), 'join press leaked');
+  press(r.slots[0], 1); r.step();
+  ok(s.pressed(BTN.A), 'printed A should be A');
+  press(r.slots[0], 1, false); r.step();
+  press(r.slots[0], 0); r.step();
+  ok(s.pressed(BTN.B), 'printed B (bottom) should be B');
+  press(r.slots[0], 0, false); press(r.slots[0], 3); r.step();
+  ok(s.pressed(BTN.X), 'top button is X on Switch');
+});
+test('Switch A reported by letter joins without a swap', () => {
+  const r = rig();
+  r.slots[0] = pad(0, PRO);
+  r.tap(r.slots[0], 0);
+  const s = r.adapter.seats[0];
+  ok(s.active);
+  press(r.slots[0], 0); r.step();
+  ok(s.pressed(BTN.A));
+});
+test('an Xbox B press still does not join, and the layout survives a reconnect', () => {
+  const r = rig();
+  r.slots[0] = pad(0); r.slots[1] = pad(1, PRO);
+  r.tap(r.slots[0], BTN.B);
+  eq(r.adapter.activeCount, 0);
+  r.tap(r.slots[1], 1);
+  r.slots[1] = null; r.step();
+  eq(r.adapter.seats[0].state, 'disconnected');
+  r.slots[1] = pad(1, PRO); r.step();
+  ok(r.adapter.seats[0].active, 'same slot restores');
+  press(r.slots[1], 1); r.step();
+  ok(r.adapter.seats[0].pressed(BTN.A), 'learned layout kept');
+});
+test('a lone sideways Joy-Con: minus pauses, one stick moves, no phantom aim', () => {
+  const r = rig();
+  r.slots[0] = pad(0, JCL);
+  r.tap(r.slots[0], 0);
+  const s = r.adapter.seats[0];
+  eq(s.kind, 'joycon');
+  r.slots[0].axes = [1, 0, 0.9, 0.9];
+  press(r.slots[0], BTN.VIEW); r.step();
+  ok(s.pressed(BTN.MENU), 'minus should open the menu');
+  const c = readControls(s);
+  ok(c.mx > 0.9 && !c.aim, 'one stick moves, aim follows movement');
+});
+test('Switch button names on screen', () => {
+  setPadStyle('nintendo');
+  eq(btnName('RB'), 'R'); eq(btnName('RT'), 'ZR'); eq(btnName('LT'), 'ZL'); eq(btnName('A'), 'A'); eq(btnName('Menu'), '+');
+  eq(btnText('Your block (RB)'), 'Your block (R)');
+  eq(btnText('X / RT'), 'X / ZR');
+  eq(btnText('BIRTHDAY RBX'), 'BIRTHDAY RBX');
+  setPadStyle('xbox');
+  eq(btnText('Your block (RB)'), 'Your block (RB)');
 });
 
 // ---- report ----
