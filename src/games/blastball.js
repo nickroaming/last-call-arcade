@@ -5,6 +5,7 @@ import { drawPlayer, drawTag, drawArm, SEAT_COLORS } from '../engine/sprites.js'
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
+import { switcheroo } from '../game/switcheroo.js';
 
 export const meta = {
   id: 'blastball', name: 'BLAST BALL', color: '#7dff8a', music: 'dustlap', tier: 1,
@@ -140,7 +141,7 @@ export function create(ctx) {
         }
       }
       if (c.blockP && p.blockCd <= 0) {
-        p.blockT = 0.35; p.blockCd = 2.2 * p.st.blockCd; sound.sfx('block');
+        p.blockT = 0.35; p.blockCd = 2.2 * p.st.blockCd; sound.sfx('block'); switcheroo(p, players, { fx, sound });
         if (p.st.blockShock) { fx.ring(p.x, p.y, 34, '#5affd9', 0.3); for (const b of balls) { const d = Math.hypot(b.x - p.x, b.y - p.y); if (d < 40) kickBall(b, (b.x - p.x) / d, (b.y - p.y) / d, 200, p); } }
       }
       if (Math.abs(c.mx) > 0.2) p.face = Math.sign(c.mx);

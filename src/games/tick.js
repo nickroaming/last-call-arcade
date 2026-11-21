@@ -5,6 +5,7 @@ import { drawPlayer, drawTag, drawArm, SEAT_COLORS } from '../engine/sprites.js'
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
+import { switcheroo } from '../game/switcheroo.js';
 
 export const meta = {
   id: 'tick', name: 'TICK TOCK', color: '#ff5a3a', music: 'rumble', tier: 1,
@@ -155,7 +156,7 @@ export function create(ctx) {
       }
       for (const b of BELTS) if (inRect(p.x, p.y, b)) p.vx += b.dir * 260 * dt;
       p.vx += env.wind * 0.5 * dt;
-      if (c.blockP && p.blockCd <= 0) { p.blockT = 0.5; p.blockCd = 2.6 * p.st.blockCd; sound.sfx('block'); }
+      if (c.blockP && p.blockCd <= 0) { p.blockT = 0.5; p.blockCd = 2.6 * p.st.blockCd; sound.sfx('block'); switcheroo(p, players, { fx, sound }); }
       if (Math.abs(c.mx) > 0.2) p.face = Math.sign(c.mx);
       p.x = clamp(p.x + p.vx * dt, p.r, 320 - p.r); p.y = clamp(p.y + p.vy * dt, TOP + p.r, BOT - p.r);
       collide(p, p.r);

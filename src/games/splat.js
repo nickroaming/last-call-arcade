@@ -5,6 +5,7 @@ import { drawPlayer, drawTag, drawArm, SEAT_COLORS, SEAT_DARK } from '../engine/
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
+import { switcheroo } from '../game/switcheroo.js';
 
 export const meta = {
   id: 'splat', name: 'SPLAT CITY', color: '#ff9a2e', music: 'coins', tier: 1,
@@ -143,7 +144,7 @@ export function create(ctx) {
         }
       }
       if (c.blockP && p.blockCd <= 0) {
-        p.blockT = 0.35; p.blockCd = 2.4 * p.st.blockCd; sound.sfx('block');
+        p.blockT = 0.35; p.blockCd = 2.4 * p.st.blockCd; sound.sfx('block'); switcheroo(p, players, { fx, sound });
         if (p.st.blockShock) { fx.ring(p.x, p.y, 28, '#5affd9', 0.3); paintAt(p.x, p.y, 22, p.idx); }
       }
       if (Math.abs(c.mx) > 0.2) p.face = Math.sign(c.mx);

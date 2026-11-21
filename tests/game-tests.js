@@ -29,6 +29,7 @@ import * as slide from '../src/games/slide.js';
 import * as swap from '../src/games/swap.js';
 import { Bot } from '../src/game/bots.js';
 import { clockAt } from '../src/game/night.js';
+import { switcheroo } from '../src/game/switcheroo.js';
 
 const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout, mobius, echo, mirror, wormhole, rules, still, spotlight, slide, swap };
 export const results = [];
@@ -250,6 +251,52 @@ function playthrough(id, opts = {}) {
   }
   return { game, secs: steps / 60 };
 }
+// ---- SWITCHEROO: blocking swaps places with a random rival ----
+test('switcheroo trades feet positions of two bodies and nothing else', () => {
+  const mk = (seat, x, y, h) => ({ seat, idx: seat - 1, st: { blockSwap: 1 }, hp: 50 + seat, b: { x, y, w: 8, h }, pos() { return [this.b.x + 4, this.b.y + this.b.h / 2]; } });
+  const a = mk(1, 10, 100, 10), b = mk(2, 200, 40, 14);
+  const q = switcheroo(a, [a, b], { box: (o) => o.b, rng: () => 0 });
+  eq(q, b);
+  eq([a.b.x + 4, a.b.y + a.b.h], [204, 54], 'a stands where b stood');
+  eq([b.b.x + 4, b.b.y + b.b.h], [14, 110], 'b stands where a stood');
+  eq([a.hp, b.hp], [51, 52], 'health stays with its owner');
+});
+test('switcheroo skips the knocked out, and does nothing without the card', () => {
+  const mk = (seat, x, extra = {}) => ({ seat, idx: seat - 1, st: { blockSwap: 1 }, x, y: 0, pos() { return [this.x, this.y]; }, ...extra });
+  const a = mk(1, 0), dead = mk(2, 50, { dead: true }), c = mk(3, 90);
+  eq(switcheroo(a, [a, dead, c], { rng: () => 0 }), c);
+  eq([a.x, c.x, dead.x], [90, 0, 50]);
+  const plain = mk(1, 5, { st: { blockSwap: 0 } });
+  eq(switcheroo(plain, [plain, c]), null);
+  eq(plain.x, 5);
+  eq(switcheroo(a, [a, dead]), null, 'nobody to swap with');
+});
+for (const id of Object.keys(GAMES)) {
+  if (id === 'lounge') continue; // Laser Lounge has no block
+  test(`${id}: SWITCHEROO swaps places when P1 blocks`, () => {
+    let swaps = 0;
+    const sound = { ...NO_SOUND, sfx: (n) => { if (n === 'swap') swaps++; } };
+    const fx = new Fx();
+    const game = GAMES[id].create({ fx, sound, variant: 0,
+      players: [1, 2, 3].map((s) => ({ seat: s, idx: s - 1, stats: statsFor(s === 1 ? { switcheroo: 1 } : {}), pickupMult: 1 })) });
+    const others = bots([2, 3]);
+    for (let k = 0; k < 60 * 30 && !game.finished && !swaps; k++) {
+      const m = others(1 / 60);
+      const press = k % 20 === 19; // often: in round events P1 may be knocked out for a while
+      m.set(1, { ...NO_CONTROLS, block: press, blockP: press });
+      fx.update(1 / 60);
+      game.update((1 / 60) * (fx.timeScale() || 0.0001), m);
+    }
+    ok(swaps > 0, 'no swap in 30 s of blocking');
+  });
+}
+test('every event finishes when all three robots swap places constantly', () => {
+  for (const id of Object.keys(GAMES)) {
+    const { game } = playthrough(id, { powers: { 1: { switcheroo: 2 }, 2: { switcheroo: 1 }, 3: { switcheroo: 1 } } });
+    ok(game.finished, `${id} did not finish`);
+    eq(game.ranking.slice().sort(), [1, 2, 3], `${id} ranking`);
+  }
+});
 for (const id of Object.keys(GAMES)) {
   test(`${id}: robots finish with a full ranking (several variants)`, () => {
     for (const v of [0, 1, 2, 3, 4, 5]) {
@@ -314,7 +361,7 @@ test('rooftop is a best-of: 2+ rounds, first to 2 wins, under the cap (F-01)', (
     const wins = game.players.map((p) => p.wins);
     ok(Math.max(...wins) >= 2 || game.round >= 5 || secs >= 55, `no winner reached 2: ${wins}`);
     ok(secs <= 62, `took ${secs}s`);
-    eq(game.ranking[0], game.players.slice().sort((a, b) => b.wins - a.wins)[0].seat, 'most round wins ranks first');
+    eq(game.players.find((p) => p.seat === game.ranking[0]).wins, Math.max(...wins), 'most round wins ranks first (ties broken by hits)');
   }
 });
 test('rooftop: a sudden-death ghost never respawns between rounds', () => {

@@ -9,6 +9,7 @@ import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 import { Drift, P } from '../engine/style.js';
 import { makeRounds } from '../game/rounds.js';
+import { switcheroo } from '../game/switcheroo.js';
 
 export const meta = {
   id: 'orbit', name: 'ORBIT OUTPOST', color: '#b48cff', music: 'lounge', tier: 2,
@@ -244,7 +245,7 @@ export function create(ctx) {
       const pd = tickStatus(p, dt); if (pd) { p.hp -= pd; if (p.hp <= 0) { kill(p); continue; } }
       const { tx, ty } = controlPlayer(p, c, dt);
       if (c.blockP && p.blockCd <= 0) {
-        p.blockT = 0.3; p.blockCd = 2.6 * p.st.blockCd; sound.sfx('block');
+        p.blockT = 0.3; p.blockCd = 2.6 * p.st.blockCd; sound.sfx('block'); switcheroo(p, players, { fx, sound, keys: ['x', 'y', 'home', 'onGround'] });
         if (p.st.blockShock) for (const o of alive()) { if (o === p) continue; const d = Math.hypot(o.x - p.x, o.y - p.y); if (d < 30 + 10 * p.st.blockShock) hurt(o, 12, ((o.x - p.x) / d) * 240, ((o.y - p.y) / d) * 240, { inv: 0.1, src: p }); }
         if (p.st.blockShock) fx.ring(p.x, p.y, 30 + 10 * p.st.blockShock, P.safe, 0.3);
         if (p.st.blockBlink) { p.x += tx * p.face * 40; p.y += ty * p.face * 40; fx.burst(p.x, p.y, 10, '#fff', { speed: 50, life: 0.3 }); }

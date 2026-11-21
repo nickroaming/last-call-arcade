@@ -7,6 +7,7 @@ import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 import { S } from '../engine/gfx.js';
+import { switcheroo } from '../game/switcheroo.js';
 
 export const meta = {
   id: 'lightsout', name: 'LIGHTS OUT', color: '#ffd84a', music: 'lounge', tier: 2,
@@ -155,7 +156,7 @@ export function create(ctx) {
           p.vx = dx * 250; p.vy = dy * 250; p.dashT = 0.15; p.dashCd = 1.2 * p.st.blockCd; sound.sfx('dash');
         }
       }
-      if (c.blockP && p.blockCd <= 0) { p.blockT = 0.4; p.blockCd = 2.4 * p.st.blockCd; sound.sfx('block'); }
+      if (c.blockP && p.blockCd <= 0) { p.blockT = 0.4; p.blockCd = 2.4 * p.st.blockCd; sound.sfx('block'); switcheroo(p, players, { fx, sound }); }
       if (Math.abs(c.mx) > 0.2) p.face = Math.sign(c.mx);
       p.x = clamp(p.x + p.vx * dt, p.r, 320 - p.r); p.y = clamp(p.y + p.vy * dt, TOP + p.r, BOT - p.r);
       for (const s of SHELVES) {

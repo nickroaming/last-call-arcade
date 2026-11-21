@@ -9,6 +9,7 @@ import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 import { Drift, P } from '../engine/style.js';
 import { makeRounds } from '../game/rounds.js';
+import { switcheroo } from '../game/switcheroo.js';
 
 export const meta = {
   id: 'mobius', name: 'MOBIUS LOOP', color: '#c86bff', music: 'rumble', tier: 3,
@@ -195,7 +196,7 @@ export function create(ctx) {
   }
 
   function block(p) {
-    p.blockT = 0.3; p.blockCd = 2.6 * p.st.blockCd; sound.sfx('block');
+    p.blockT = 0.3; p.blockCd = 2.6 * p.st.blockCd; sound.sfx('block'); switcheroo(p, players, { fx, sound, box: (q) => q.b, alive: (q) => !q.dead && !q.perma });
     const [cx, cy] = p.pos();
     if (p.st.blockShock) {
       const R = 26 + 10 * p.st.blockShock;

@@ -5,6 +5,7 @@ import { makeBody, platformControl, stepBody, moveMovers } from './platformer.js
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
+import { switcheroo } from '../game/switcheroo.js';
 
 export const meta = {
   id: 'coins', name: 'COIN STORM', color: '#ffd84a', music: 'coins', tier: 1,
@@ -211,7 +212,7 @@ export function create(ctx) {
       if (ev) { sound.sfx('jump'); fx.dust(p.b.x + p.b.w / 2, p.b.y + p.b.h, '#8a8aa8'); }
       if (Math.abs(c.mx) > 0.2) p.face = Math.sign(c.mx);
       if (c.blockP && p.blockCd <= 0) {
-        p.blockT = 0.35; p.blockCd = 2.4 * p.st.blockCd; sound.sfx('block');
+        p.blockT = 0.35; p.blockCd = 2.4 * p.st.blockCd; sound.sfx('block'); switcheroo(p, players, { fx, sound, box: (q) => q.b });
         if (p.st.blockShock) shockwave(p);
         if (p.st.blockBlink) { p.b.x = clamp(p.b.x + (Math.abs(c.mx) > 0.3 ? Math.sign(c.mx) : p.face) * 46, 0, 312); fx.burst(p.b.x, p.b.y, 10, '#fff', { speed: 50, life: 0.3 }); }
       }

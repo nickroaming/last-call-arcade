@@ -6,6 +6,7 @@ import { makeBody, platformControl, stepBody } from './platformer.js';
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
+import { switcheroo } from '../game/switcheroo.js';
 
 export const meta = {
   id: 'updraft', name: 'UPDRAFT', color: '#5affd9', music: 'dustlap', tier: 1,
@@ -139,7 +140,7 @@ export function create(ctx) {
       const ev = platformControl(p.b, c, p.st, dt, env);
       if (ev) { sound.sfx('jump'); fx.dust(p.b.x + p.b.w / 2, p.b.y + p.b.h, '#bff3ff'); }
       if (Math.abs(c.mx) > 0.2) p.face = Math.sign(c.mx);
-      if (c.blockP && p.blockCd <= 0) { p.blockT = 0.3; p.blockCd = 2.4 * p.st.blockCd; sound.sfx('block'); if (p.st.blockBlink) { p.b.y -= 30; p.b.vy = Math.min(p.b.vy, 0); fx.burst(p.b.x, p.b.y, 10, '#fff', { speed: 50, life: 0.3 }); } }
+      if (c.blockP && p.blockCd <= 0) { p.blockT = 0.3; p.blockCd = 2.4 * p.st.blockCd; sound.sfx('block'); switcheroo(p, players, { fx, sound, box: (q) => q.b }); if (p.st.blockBlink) { p.b.y -= 30; p.b.vy = Math.min(p.b.vy, 0); fx.burst(p.b.x, p.b.y, 10, '#fff', { speed: 50, life: 0.3 }); } }
       const a = c.aim ? Math.atan2(c.ay, c.ax) : Math.hypot(c.mx, c.my) > 0.4 ? Math.atan2(c.my, c.mx) : (p.face > 0 ? 0 : Math.PI);
       const [cx, cy] = p.pos();
       guns.trigger(p, p.gs, p.st.gun, c.fire, a, cx + Math.cos(a) * 5, cy + Math.sin(a) * 5, dt);

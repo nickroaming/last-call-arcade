@@ -89,6 +89,7 @@ export class Sound {
       // a hit is two layers: a body thump and a pitch-varied crack, so ten hits in a row don't sound like one
       case 'hit': { const v = 0.88 + Math.random() * 0.24; this.tone({ f: 110 * v, f2: 45, type: 'sine', dur: 0.12, vol: 0.4 }); this.tone({ f: 190 * v, f2: 70, type: 'sawtooth', dur: 0.1, vol: 0.18 }); this.noise({ dur: 0.07, vol: 0.2, hp: 2500 }); break; }
       case 'hitBig': this.tone({ f: 90, f2: 32, type: 'sine', dur: 0.22, vol: 0.55 }); this.tone({ f: 160, f2: 50, type: 'sawtooth', dur: 0.16, vol: 0.22 }); this.noise({ dur: 0.16, vol: 0.3, hp: 1800 }); this.noise({ dur: 0.2, vol: 0.2, lp: 500 }); break;
+      case 'swap': this.tone({ f: 300, f2: 1400, type: 'triangle', dur: 0.14, vol: 0.18 }); this.tone({ f: 1400, f2: 300, type: 'triangle', dur: 0.14, vol: 0.14, at: t + 0.1 }); this.noise({ dur: 0.18, vol: 0.1, hp: 3000 }); break;
       case 'block': this.tone({ f: 1200, f2: 1500, type: 'triangle', dur: 0.12, vol: 0.2 }); break;
       case 'boom': this.noise({ dur: 0.5, vol: 0.45, lp: 900 }); this.tone({ f: 120, f2: 30, type: 'sine', dur: 0.45, vol: 0.5 }); break;
       case 'ko': this.noise({ dur: 0.7, vol: 0.5, lp: 1200 }); this.tone({ f: 400, f2: 40, type: 'sawtooth', dur: 0.6, vol: 0.3 }); break;

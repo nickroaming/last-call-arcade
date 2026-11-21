@@ -12,7 +12,7 @@ export const RARITY = {
 export function baseStats() {
   return {
     hp: 100, speed: 1, jump: 1, airJumps: 1, grav: 1, size: 1, knockTaken: 1, shields: 0,
-    blockCd: 1, blockShock: 0, blockBlink: 0, blockHeal: 0, reflect: false, magnet: 0,
+    blockCd: 1, blockShock: 0, blockBlink: 0, blockSwap: 0, blockHeal: 0, reflect: false, magnet: 0,
     tipsy: 0, wobble: 0, mult: 1,
     gun: {
       dmg: 34, pellets: 1, spread: 0.14, speed: 240, grav: 1, size: 1.6, ammo: 3, reload: 1.2, delay: 0.28, burst: 1,
@@ -77,6 +77,8 @@ export const POWERS = [
     (s) => { s.blockBlink += 1; s.blockCd *= 1.15; }),
   P('mirror', 'MIRROR BLOCK', 'uncommon', 'block', ['Block recharges 40% faster', 'Blocking sends bullets back'],
     (s) => { s.blockCd *= 0.6; s.reflect = true; }),
+  P('switcheroo', 'SWITCHEROO', 'uncommon', 'block', ['Blocking swaps places with a random rival', 'Block recharges 60% slower'],
+    (s) => { s.blockSwap += 1; s.blockCd *= 1.6; }),
   P('patchup', 'PATCH-UP BLOCK', 'uncommon', 'block', ['Blocking heals 20 health', 'Block recharges 10% slower'],
     (s) => { s.blockHeal += 20; s.blockCd *= 1.1; }),
   // ---- body: uncommon ----

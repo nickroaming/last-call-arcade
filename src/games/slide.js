@@ -10,6 +10,7 @@ import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 import { Drift, P } from '../engine/style.js';
 import { makeRounds } from '../game/rounds.js';
+import { switcheroo } from '../game/switcheroo.js';
 
 export const meta = {
   id: 'slide', name: 'ZERO FRICTION', color: '#9fe8ff', music: 'lounge', tier: 2,
@@ -154,7 +155,7 @@ export function create(ctx) {
         p.vx += dx * 125; p.vy += dy * 125; p.dashT = 0.25; p.dashCd = 1.4 * p.st.blockCd; sound.sfx('dash');
         fx.burst(p.x, p.y, 8, '#e8f8ff', { speed: 60, life: 0.3, angle: Math.atan2(-dy, -dx), spread: 1 });
       }
-      if (c.blockP && p.blockCd <= 0) { p.blockT = 0.45; p.blockCd = 2.4 * p.st.blockCd; sound.sfx('block'); }
+      if (c.blockP && p.blockCd <= 0) { p.blockT = 0.45; p.blockCd = 2.4 * p.st.blockCd; sound.sfx('block'); switcheroo(p, players, { fx, sound }); }
       if (Math.abs(c.mx) > 0.2) p.face = Math.sign(c.mx);
       const a = c.aim ? Math.atan2(c.ay, c.ax) : Math.hypot(c.mx, c.my) > 0.3 ? Math.atan2(c.my, c.mx) : (p.face > 0 ? 0 : Math.PI);
       if (guns.trigger(p, p.gs, p.st.gun, c.fire, a, p.x + Math.cos(a) * 8, p.y + Math.sin(a) * 8, dt)) {

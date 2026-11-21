@@ -8,6 +8,7 @@ import { drawPlayer, drawTag, drawGun, SEAT_COLORS } from '../engine/sprites.js'
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
+import { switcheroo } from '../game/switcheroo.js';
 
 export const meta = {
   id: 'mirror', name: 'MIRROR TWINS', color: '#9fd3ff', music: 'coins', tier: 2,
@@ -180,7 +181,7 @@ export function create(ctx) {
           p.mvx = dx * 240; p.mvy = dy * 240; p.dashT = 0.14; p.dashCd = 1.2 * p.st.blockCd; sound.sfx('dash');
         }
       }
-      if (c.blockP && p.blockCd <= 0 && !p.ghost) { p.blockT = 0.45; p.blockCd = 2.6 * p.st.blockCd; sound.sfx('block'); }
+      if (c.blockP && p.blockCd <= 0 && !p.ghost) { p.blockT = 0.45; p.blockCd = 2.6 * p.st.blockCd; sound.sfx('block'); switcheroo(p, players, { fx, sound, obj: (q) => q.A, also: (a, b) => { for (const k of ['x', 'y']) { const t = a.B[k]; a.B[k] = b.B[k]; b.B[k] = t; } } }); }
       if (Math.abs(c.mx) > 0.2) p.face = Math.sign(c.mx);
       const wind = env.wind * 0.5;
       moveBody(p.A, p.mvx + wind, p.mvy, dt);

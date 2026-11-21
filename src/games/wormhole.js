@@ -11,6 +11,7 @@ import { makeBody, platformControl, stepBody } from './platformer.js';
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
+import { switcheroo } from '../game/switcheroo.js';
 
 export const meta = {
   id: 'wormhole', name: 'WORMHOLE', color: '#ffb03a', music: 'rumble', tier: 3,
@@ -236,7 +237,7 @@ export function create(ctx) {
       if (p.flingT > 0 && !p.b.onGround) p.b.vx = keepVx * Math.pow(0.6, dt); // a fling carries: no air steering for a moment
       if (ev) { sound.sfx('jump'); fx.dust(p.b.x + p.b.w / 2, p.b.y + p.b.h, '#ffcf8a'); }
       if (Math.abs(c.mx) > 0.2) p.face = Math.sign(c.mx);
-      if (c.blockP && p.blockCd <= 0 && !p.ghost) { p.blockT = 0.35; p.blockCd = 2.4 * p.st.blockCd; sound.sfx('block'); }
+      if (c.blockP && p.blockCd <= 0 && !p.ghost) { p.blockT = 0.35; p.blockCd = 2.4 * p.st.blockCd; sound.sfx('block'); switcheroo(p, players, { fx, sound, box: (q) => q.b }); }
       const a = c.aim ? Math.atan2(c.ay, c.ax) : Math.hypot(c.mx, c.my) > 0.4 ? Math.atan2(c.my, c.mx) : (p.face > 0 ? 0 : Math.PI);
       p.aim = a;
       const [cx, cy] = p.pos();

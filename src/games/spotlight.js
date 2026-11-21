@@ -10,6 +10,7 @@ import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 import { Drift, P } from '../engine/style.js';
+import { switcheroo } from '../game/switcheroo.js';
 
 export const meta = {
   id: 'spotlight', name: 'SPOTLIGHT', color: '#fff2a8', music: 'coins', tier: 1,
@@ -138,7 +139,7 @@ export function create(ctx) {
       const ev = platformControl(p.b, c, p.st, dt, env);
       if (ev) { sound.sfx('jump'); fx.dust(p.b.x + p.b.w / 2, p.b.y + p.b.h, '#c8b8a0'); }
       if (Math.abs(c.mx) > 0.2) p.face = Math.sign(c.mx);
-      if (c.blockP && p.blockCd <= 0) { p.blockT = 0.3; p.blockCd = 2.4 * p.st.blockCd; sound.sfx('block'); }
+      if (c.blockP && p.blockCd <= 0) { p.blockT = 0.3; p.blockCd = 2.4 * p.st.blockCd; sound.sfx('block'); switcheroo(p, players, { fx, sound, box: (q) => q.b }); }
       const a = c.aim ? Math.atan2(c.ay, c.ax) : Math.hypot(c.mx, c.my) > 0.4 ? Math.atan2(c.my, c.mx) : (p.face > 0 ? 0 : Math.PI);
       const [cx, cy] = p.pos();
       if (guns.trigger(p, p.gs, p.st.gun, c.fire && p.b.stun <= 0, a, cx + Math.cos(a) * 9, cy - 1 + Math.sin(a) * 9, dt)) { p.b.vx -= Math.cos(a) * 25; p.b.squash = 0.2; }

@@ -15,7 +15,7 @@ import { Bot } from './bots.js';
 import { Drift, P, glyph, prompt, setPadStyle } from '../engine/style.js';
 import { ACTS, clockAt, cabinetQuip, drawStage, drawCrt, drawBezel, drawVoice, drawCabinet, drawNightStrip } from './night.js';
 
-export const BUILD = 'm1-2026-11-20.12-switch';
+export const BUILD = 'm1-2026-11-20.13-switcheroo';
 export { GAMES };
 // The core set: the events that pass the quality bar (docs/PLAYTEST.md, tests/measure.html).
 // Four per act, so every night builds from grounded to mind-bending. ALL EVENTS adds the rest.

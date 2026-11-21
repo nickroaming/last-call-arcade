@@ -9,6 +9,7 @@ import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 import { baseStats } from '../game/powers.js';
+import { switcheroo } from '../game/switcheroo.js';
 
 export const meta = {
   id: 'still', name: 'STILL LIFE', color: '#e8e4f8', music: 'lounge', tier: 2,
@@ -111,7 +112,7 @@ export function create(ctx) {
           p.vx = dx * 250; p.vy = dy * 250; p.dashT = 0.14; p.dashCd = 1.2 * p.st.blockCd; sound.sfx('dash');
         }
       }
-      if (c.blockP && p.blockCd <= 0 && !p.ghost) { p.blockT = 0.45; p.blockCd = 2.6 * p.st.blockCd; sound.sfx('block'); }
+      if (c.blockP && p.blockCd <= 0 && !p.ghost) { p.blockT = 0.45; p.blockCd = 2.6 * p.st.blockCd; sound.sfx('block'); switcheroo(p, players, { fx, sound }); }
       if (Math.abs(c.mx) > 0.2) p.face = Math.sign(c.mx);
       p.x = clamp(p.x + p.vx * dt, p.r, 320 - p.r); p.y = clamp(p.y + p.vy * dt, TOP + p.r, BOT - p.r);
       p.act = clamp(Math.hypot(p.vx, p.vy) / Math.max(1, max), 0, 1) + (p.dashT > 0 ? 1 : 0);

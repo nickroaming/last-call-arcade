@@ -8,6 +8,7 @@ import { Guns, newGunState, hitEffects, tickStatus } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 import { Drift, P } from '../engine/style.js';
+import { switcheroo } from '../game/switcheroo.js';
 
 export const meta = {
   id: 'rumble', name: 'RICOCHET ROOFTOP', color: '#33d6ff', music: 'rumble', tier: 1,
@@ -163,7 +164,7 @@ export function create(ctx) {
   const pickups = new Pickups({ fx, sound, spot: () => { const s = solids.filter((q) => !q.gone)[Math.floor(rand(0, solids.length))] || solids[0]; return [clamp(s.x + rand(6, s.w - 6), 8, 312), s.y - 8]; } });
 
   function block(p, c) {
-    p.blockT = 0.3; p.blockCd = 2.6 * p.st.blockCd; sound.sfx('block');
+    p.blockT = 0.3; p.blockCd = 2.6 * p.st.blockCd; sound.sfx('block'); switcheroo(p, players, { fx, sound, box: (q) => q.b, alive: (q) => !q.dead && !q.perma });
     const [cx, cy] = p.pos();
     if (p.st.blockBlink) {
       const m = Math.hypot(c.mx, c.my) || 1;

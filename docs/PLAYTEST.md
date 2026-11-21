@@ -1,7 +1,16 @@
 # Playtest and backlog
 
-**Latest build:** `m1-2026-11-20.12-switch` (branch `switch-controllers`, not published). **Live on the Xbox link:** `m1-2026-11-20.11-three`. **Before that:** `m1-2026-11-20.9-core` (branch `quality/core-pass`), `m1-2026-11-20.8-polish` (live on the Xbox link). The rooftop slice below is compared against `m1-2026-11-20.7`, kept playable in `before/`.
+**Latest build:** `m1-2026-11-20.13-switcheroo` (branch `power/switcheroo`, not published). **Live on the Xbox link:** `m1-2026-11-20.12-switch`. **Before that:** `m1-2026-11-20.9-core` (branch `quality/core-pass`), `m1-2026-11-20.8-polish` (live on the Xbox link). The rooftop slice below is compared against `m1-2026-11-20.7`, kept playable in `before/`.
 **Date:** 2026-11-20. **Environment for everything below:** Chromium browser pane on macOS, keyboard P1 + CPU P2/P3. **Nothing here was run on the Series X.**
+
+## SWITCHEROO card (`m1-2026-11-20.13-switcheroo`)
+- **The card:** uncommon block card. "Blocking swaps places with a random rival / Block recharges 60% slower." Losers can draft it like any card, and taking it twice slows the recharge again.
+- **When:** any moment your block is charged. You still block (so you are safe during the swap), then trade spots with a random rival who is still in play. Knocked-out, ghost, turret and finished players are never picked; with nobody to pick it says NOBODY TO SWAP.
+- **What moves:** only the position. Health, gems, paint, laps and score stay with the player. Platform events swap feet positions so a bigger body never lands inside a floor. Orbit Outpost also swaps which planet you stand on; Dust Lap swaps spot and heading on the hop; Body Snatch swaps the bodies' spots; Mirror Match swaps both twins. Laser Lounge has no block, so the card does nothing there (the card says so).
+- **Readable:** a dotted streak in each player's colour shows who went where, rings at both spots, a SWITCHEROO pop-up and a two-way swoosh sound (`switcheroo_*` captures).
+- **Tests:** feet-position swap, skipping the knocked out, no card = no swap, every event swaps when P1 blocks, every event finishes with three swapping robots.
+- **Watch on the TV:** whether 2.6-4 s between swaps feels fun or chaotic in Rooftop and Dust Lap.
+- **Known flaky test:** "a player who never touches the controller cannot win" uses random robots and fails about once per few runs on a different event each time (Echo Chamber, Zero Friction). It does not involve this card. The real-CPU measurements still show 0% idle wins.
 
 ## Switch controllers (`m1-2026-11-20.12-switch`)
 The Switch and Switch 2 have no browser you can open (only a hidden one Nintendo keeps locking down), so the game cannot run on the console. What works: Switch controllers on a computer plugged into the TV, in Chrome or Edge.

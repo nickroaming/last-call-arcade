@@ -10,6 +10,7 @@ import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
 import { Drift, P } from '../engine/style.js';
 import { SEAT_NAMES } from '../engine/sprites.js';
+import { switcheroo } from '../game/switcheroo.js';
 
 export const meta = {
   id: 'swap', name: 'BODY SNATCH', color: '#c8ff6a', music: 'rumble', tier: 3,
@@ -138,7 +139,7 @@ export function create(ctx) {
           b.vx = dx * 250; b.vy = dy * 250; b.dashT = 0.14; b.dashCd = 1.2 * p.st.blockCd; sound.sfx('dash');
         }
       }
-      if (c.blockP && b.blockCd <= 0) { b.blockT = 0.45; b.blockCd = 2.6 * p.st.blockCd; sound.sfx('block'); }
+      if (c.blockP && b.blockCd <= 0) { b.blockT = 0.45; b.blockCd = 2.6 * p.st.blockCd; sound.sfx('block'); switcheroo(p, players, { fx, sound, obj: (q) => q.body, alive: (q) => !!q.body }); }
       if (Math.abs(c.mx) > 0.2) b.face = Math.sign(c.mx);
       b.aim = c.aim ? Math.atan2(c.ay, c.ax) : Math.hypot(c.mx, c.my) > 0.3 ? Math.atan2(c.my, c.mx) : (b.face > 0 ? 0 : Math.PI);
       if (guns.trigger(p, p.gs, p.st.gun, c.fire && b.stun <= 0, b.aim, b.x + Math.cos(b.aim) * 8, b.y + Math.sin(b.aim) * 8, dt)) b.recoilAt = p.recoilAt;

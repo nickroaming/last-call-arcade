@@ -5,6 +5,7 @@ import { S } from '../engine/gfx.js';
 import { Guns, newGunState } from '../game/weapons.js';
 import { twistEnv } from '../game/twists.js';
 import { Pickups, makeBuffable, tickBuffs, drawBuffs } from '../game/pickups.js';
+import { switcheroo } from '../game/switcheroo.js';
 
 export const meta = {
   id: 'dustlap', name: 'DUST LAP', color: '#ff9a2e', music: 'dustlap', tier: 1,
@@ -239,7 +240,7 @@ export function create(ctx) {
           }
         }
         if (k.blockP && c.hopCd <= 0 && c.hopT <= 0) {
-          c.hopT = c.hopMax; c.hopCd = 1.8 * c.st.blockCd; sound.sfx('jump'); fx.dust(c.x, c.y, '#d9b48a', 5);
+          c.hopT = c.hopMax; c.hopCd = 1.8 * c.st.blockCd; sound.sfx('jump'); switcheroo(c, cars, { fx, sound, keys: ['x', 'y', 'ang'] }); fx.dust(c.x, c.y, '#d9b48a', 5);
           if (c.st.blockBlink) { c.x += Math.cos(c.ang) * 30; c.y += Math.sin(c.ang) * 30; fx.burst(c.x, c.y, 8, '#fff', { speed: 50, life: 0.3 }); }
         }
         const aim = k.aim ? Math.atan2(k.ay, k.ax) : c.ang;
