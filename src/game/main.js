@@ -1,6 +1,7 @@
 // LAST CALL ARCADE: game night flow.
 // title/join → intro → countdown → play → finish → results → draft → … → podium → rematch
 import { InputAdapter, BTN } from '../input/gamepad-adapter.js';
+import { installXboxWatch, keyEventPad, watchPads, xboxProblem, xboxDiag, IS_XBOX } from '../input/xbox-mode.js';
 import { Gfx } from '../engine/gfx.js';
 import { Fx, SHAKE_LEVELS } from '../engine/fx.js';
 import { Sound } from '../engine/audio.js';
@@ -15,7 +16,7 @@ import { Bot } from './bots.js';
 import { Drift, P, glyph, prompt, setPadStyle } from '../engine/style.js';
 import { ACTS, clockAt, cabinetQuip, drawStage, drawCrt, drawBezel, drawVoice, drawCabinet, drawNightStrip } from './night.js';
 
-export const BUILD = 'm1-2026-11-20.13-switcheroo';
+export const BUILD = 'm1-2026-11-23.14-xbox-input';
 export { GAMES };
 // The core set: the events that pass the quality bar (docs/PLAYTEST.md, tests/measure.html).
 // Four per act, so every night builds from grounded to mind-bending. ALL EVENTS adds the rest.
@@ -44,13 +45,16 @@ const DEFAULT_PROMPTS = ['Toast the winner!', 'Snack break - grab something', 'L
 // ---------- setup ----------
 try { if ('gamepadInputEmulation' in navigator) navigator.gamepadInputEmulation = 'gamepad'; } catch (e) { /* ignore */ }
 installKeyboard();
+installXboxWatch();
+const SHOW_PADS = params.has('pads');
+const rawPads = () => (navigator.getGamepads ? Array.from(navigator.getGamepads()) : []);
 const bots = [];
 let wantBot = 0;
 let kbStart = false;
 addEventListener('keydown', (e) => { if (e.code === 'KeyC' && !e.repeat) wantBot += 1; if (e.code === 'Enter' && !e.repeat) kbStart = true; });
 const input = new InputAdapter({
   seatCount: 3,
-  getGamepads: () => [...(navigator.getGamepads ? Array.from(navigator.getGamepads()) : []), ...keyboardPads(), ...bots.map((b) => b.pad())],
+  getGamepads: () => [...rawPads(), ...keyEventPad(), ...keyboardPads(), ...bots.map((b) => b.pad())],
 });
 const canvas = document.getElementById('game');
 const g = new Gfx(canvas);
@@ -272,6 +276,7 @@ function update(dt) {
   drift.update(dt);
   st.wipe = Math.max(0, st.wipe - dt);
   runBots(dt);
+  watchPads(rawPads());
   const events = input.update(performance.now());
   pickPadStyle();
   if (events.some((e) => e.type === 'press' || e.type === 'join')) sound.ensure();
@@ -287,7 +292,7 @@ function update(dt) {
   if (st.screen === 'title') return updateTitle(dt);
 
   // pause (Menu) and controller drop
-  if (!st.paused && (anyPressed(BTN.MENU, inMatch) || (missing.length && ['countdown', 'play'].includes(st.screen)))) {
+  if (!st.paused && (anyPressed(BTN.MENU, inMatch) || (xboxProblem() && ['countdown', 'play'].includes(st.screen)) || (missing.length && ['countdown', 'play'].includes(st.screen)))) {
     st.paused = true; sound.sfx('beep');
     return;
   }
@@ -526,6 +531,46 @@ function draw() {
   if (st.paused) drawPause();
   if (st.opts) drawOptions();
   drawWipe();
+  drawXboxHelp();
+  if (SHOW_PADS) drawPadDiag();
+}
+/** Edge on Xbox: tell the players how to hand the controller to the game. */
+function drawXboxHelp() {
+  const why = xboxProblem();
+  if (!why) return;
+  g.alpha(0.9); g.rect(0, 0, 320, 180, '#05040a', true); g.alpha(1);
+  panel(20, 18, 280, 144, P.warn);
+  if (why === 'focus') {
+    g.text('THE GAME LOST THE CONTROLLER', 160, 32, { scale: 2, col: P.warn, align: 'center', raw: true });
+    g.text('PRESS THE XBOX BUTTON TO OPEN THE GUIDE,', 160, 62, { scale: 2, col: P.text, align: 'center', raw: true });
+    g.text('THEN PRESS IT AGAIN TO CLOSE IT.', 160, 76, { scale: 2, col: P.text, align: 'center', raw: true });
+    g.text('THIS HAPPENS AFTER THE VIEW BUTTON IN EDGE.', 160, 104, { scale: 1, col: P.dim, align: 'center', raw: true });
+    g.text('YOUR GAME IS SAVED AND PAUSED.', 160, 116, { scale: 1, col: P.dim, align: 'center', raw: true });
+    return;
+  }
+  g.text('BUTTONS NOT WORKING?', 160, 28, { scale: 3, col: P.warn, align: 'center', raw: true });
+  g.text('EDGE IS USING THE CONTROLLER AS A MOUSE.', 160, 52, { scale: 1, col: P.dim, align: 'center', raw: true });
+  g.text('SWITCH IT TO GAME CONTROLS:', 160, 62, { scale: 1, col: P.dim, align: 'center', raw: true });
+  g.text('1. HOLD THE MENU BUTTON', 44, 80, { scale: 2, col: P.text, raw: true });
+  g.text('   (THREE LINES, RIGHT OF THE XBOX BUTTON)', 44, 93, { scale: 1, col: P.dim, raw: true });
+  g.text('2. CHOOSE "USE GAME CONTROLS", PRESS A', 44, 104, { scale: 2, col: P.text, raw: true });
+  g.text('3. PRESS A TO JOIN', 44, 120, { scale: 2, col: P.good, raw: true });
+  g.text('STILL STUCK FOR ONE PLAYER? THEY DO STEP 1 TOO. DON\'T HOLD MENU IN PLAY:', 160, 140, { scale: 1, col: P.dim, align: 'center', raw: true });
+  g.text('A QUICK PRESS PAUSES, A LONG HOLD SWITCHES BACK TO MOUSE MODE.', 160, 150, { scale: 1, col: P.dim, align: 'center', raw: true });
+}
+/** ?pads: what the browser reports, for a photo when something is wrong. */
+function drawPadDiag() {
+  const d = xboxDiag();
+  const list = rawPads().filter(Boolean);
+  g.alpha(0.85); g.rect(0, 0, 320, 12 + list.length * 20 + 14, '#000', true); g.alpha(1);
+  g.text(`PADS ${list.length}  XBOX ${d.isXbox ? 'Y' : 'N'}  FOCUS ${d.focused ? 'Y' : 'N'}  MOUSE ${d.mouseCount}  KEY ${d.lastKey || '-'}  KEYPAD ${d.keyPad ? 'Y' : 'N'}  ${xboxProblem() || 'OK'}`, 2, 2, { scale: 1, col: '#fff', raw: true });
+  list.forEach((gp, k) => {
+    const on = Array.from(gp.buttons || []).map((b, i) => ((b.pressed || b.value > 0.5) ? i : null)).filter((i) => i !== null);
+    const ax = Array.from(gp.axes || []).map((a) => a.toFixed(1)).join(' ');
+    g.text(`${gp.index}: ${(gp.id || '?').slice(0, 70)}`, 2, 12 + k * 20, { scale: 1, col: '#9ef', raw: true });
+    g.text(`  MAP ${gp.mapping || 'none'}  BTNS ${gp.buttons.length} [${on.join(',')}]  AXES ${ax}`, 2, 20 + k * 20, { scale: 1, col: '#ff9', raw: true });
+  });
+  g.text(navigator.userAgent.slice(0, 90), 2, 12 + list.length * 20 + 2, { scale: 1, col: '#888', raw: true });
 }
 /** A shutter that opens on each new screen: ink bands slide away, staggered. Calm mode fades instead. */
 function drawWipe() {
@@ -1010,6 +1055,6 @@ requestAnimationFrame(frame);
 
 // For automated browser checks only.
 window.__lca = {
-  st, input, fx, sound, settings, GAMES, CORE, drift, applyLook, bots, openOptions, OPTS,
+  st, input, fx, sound, settings, xboxDiag, xboxProblem, IS_XBOX, GAMES, CORE, drift, applyLook, bots, openOptions, OPTS,
   step(n = 1) { for (let i = 0; i < n; i++) update(STEP); draw(); },
 };

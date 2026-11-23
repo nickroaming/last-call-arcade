@@ -41,6 +41,17 @@ Nineteen arcade minigames in three acts; a night plays 8 of them, starting groun
 
 Handy link options: `?events=4` for a short match, `?only=orbit` to practise one game, `?twist=moon` to force a twist, `?solo` to start with one player, `?rules=Toast the winner|Snack break` for your own House Rules prompts.
 
+## Xbox: if the buttons don't work
+Edge on the Xbox often starts in **browsing controls**, where the controller drives a mouse cursor and the game never sees a button press.
+The game spots this and shows the fix on screen:
+1. Hold the **Menu** button (three lines) until Edge's menu opens.
+2. Choose **Use game controls** and press A.
+3. Press A to join.
+
+Holding Menu again switches back to mouse mode, so use a quick press to pause.
+If the page stops reacting after the **View** button, press the Xbox button to open the Guide, then press it again to close it.
+Add `?pads` to the link to see what the browser reports for each controller. Take a photo of that if something is still wrong.
+
 ## Switch controllers
 The Switch has no usable browser, so play on a computer hooked to the TV and pair Switch controllers over Bluetooth (Chrome or Edge). Pro Controllers, Joy-Con pairs and single sideways Joy-Cons each seat one player. Press the A printed on the controller to join; prompts switch to Switch names (L/R, ZL/ZR, -/+) automatically, or set OPTIONS > BUTTONS. Details: [docs/PLAYTEST.md](docs/PLAYTEST.md).
 
