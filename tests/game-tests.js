@@ -30,6 +30,8 @@ import * as swap from '../src/games/swap.js';
 import { Bot } from '../src/game/bots.js';
 import { clockAt } from '../src/game/night.js';
 import { switcheroo } from '../src/game/switcheroo.js';
+import { COMBOS, GROUPS, combosFor, combosUnlockedBy } from '../src/game/combos.js';
+import { mashup } from '../src/game/match.js';
 
 const GAMES = { rumble, dustlap, lounge, coins, orbit, blastball, splat, tick, updraft, lightsout, mobius, echo, mirror, wormhole, rules, still, spotlight, slide, swap };
 export const results = [];
@@ -86,8 +88,8 @@ test('offer: 3 different powers, never one at the cap', () => {
     const h = m.offer(1);
     eq(new Set(h).size, 3);
   }
-  m.pick(1, 'rubber'); m.pick(1, 'rubber');
-  eq(m.pick(1, 'rubber'), false, 'third stack refused');
+  for (let k = 0; k < MAX_STACK; k++) m.pick(1, 'rubber');
+  eq(m.pick(1, 'rubber'), false, 'stack past the cap refused');
   for (let k = 0; k < 100; k++) ok(!m.offer(1).includes('rubber'), 'capped power offered');
 });
 test('powers stack across events and reset on rematch', () => {
@@ -172,8 +174,127 @@ test('bank shot grows damage per bounce; splitter doubles bullets on bounce', ()
   const g = statsFor({ bankshot: 1, splitter: 1 }).gun;
   guns.spawn({ idx: 0 }, 10, 120, Math.PI, g);
   for (let k = 0; k < 20; k++) guns.update(1 / 60);
-  eq(guns.bullets.length, 2, 'split on first bounce');
+  eq(guns.bullets.length, 3, 'FRACTAL combo (bank shot + splitter): splits in three');
   ok(guns.bullets[0].dmg > g.dmg * 1.5, 'bounce damage');
+  const g2 = statsFor({ splitter: 1 }).gun;
+  const guns2 = new Guns(w, fx0(), NO_SOUND);
+  guns2.spawn({ idx: 0 }, 10, 120, Math.PI, g2);
+  for (let k = 0; k < 20; k++) guns2.update(1 / 60);
+  eq(guns2.bullets.length, 2, 'plain splitter: two');
+});
+// ---- 2.0 card system: deeper stacks, new traits, combos ----
+test('cards stack five deep', () => {
+  eq(MAX_STACK, 5);
+  eq(statsFor({ rubber: 5 }).gun.bounces, 10);
+  const m = new Match([1, 2], ['rumble']);
+  for (let k = 0; k < 5; k++) ok(m.pick(1, 'scatter'));
+  ok(!m.pick(1, 'scatter'), 'sixth refused');
+});
+test('every combo group names real cards, every combo is reachable', () => {
+  for (const [gname, ids] of Object.entries(GROUPS)) ids.forEach((id) => ok(POWERS.some((p) => p.id === id), `${gname}: ${id}`));
+  for (const c of COMBOS) {
+    const powers = Object.fromEntries(c.needs.map((g) => [GROUPS[g][0], 1]));
+    ok(combosFor(powers).some((x) => x.id === c.id), c.id);
+    ok(c.text.length > 8 && c.name.length > 3, c.id);
+  }
+  ok(COMBOS.length >= 20);
+});
+test('combos show up in stats, and the draft can tell which card completes one', () => {
+  const s = statsFor({ growth: 1, boomstick: 1 });
+  ok(s.combos.includes('supernova')); ok(s.gun.cx.supernova);
+  eq(combosUnlockedBy({ boomstick: 1 }, 'growth').map((c) => c.id), ['supernova']);
+  eq(combosUnlockedBy({ boomstick: 1, growth: 1 }, 'growth'), [], 'already had it');
+  eq(statsFor({}).combos, []);
+});
+test('MASH-UP deals two random cards and never itself', () => {
+  for (let k = 0; k < 50; k++) {
+    const powers = {};
+    const got = mashup(powers);
+    eq(got.length, 2); ok(!got.includes('mashup'));
+    eq(Object.values(powers).reduce((a, b) => a + b, 0), 2);
+  }
+  const m = new Match([1, 2], ['rumble']);
+  m.pick(1, 'mashup');
+  eq(m.player(1).gained.length, 2); ok(!m.player(1).powers.mashup);
+});
+test('GROWTH SPURT: bullets grow and hit harder in flight (to 4x)', () => {
+  const { w } = gunWorld({ targets: () => [] });
+  const guns = new Guns(w, fx0(), NO_SOUND);
+  const g = statsFor({ growth: 2 }).gun;
+  guns.spawn({ idx: 0 }, 20, 90, 0, g);
+  const b = guns.bullets[0], r0 = b.r, d0 = b.dmg;
+  for (let k = 0; k < 60; k++) guns.update(1 / 60);
+  ok(b.r > r0 * 1.8 && b.r <= g.size * 4 + 1e-6, `size ${r0} -> ${b.r}`);
+  ok(b.dmg / d0 > 1.8, 'damage grew with it');
+});
+test('DRILL BIT: a bullet passes through one rival per card', () => {
+  const hits = [];
+  const ts = [{ ref: 'A', owner: { idx: 1 }, x: 80, y: 90, r: 4 }, { ref: 'B', owner: { idx: 2 }, x: 140, y: 90, r: 4 }];
+  const { w } = gunWorld({ targets: () => ts, onHit: (ref) => { hits.push(ref); return 'hit'; } });
+  const guns = new Guns(w, fx0(), NO_SOUND);
+  guns.spawn({ idx: 0 }, 20, 90, 0, { ...statsFor({ drill: 1 }).gun, grav: 0 });
+  for (let k = 0; k < 60; k++) guns.update(1 / 60);
+  eq(hits, ['A', 'B']);
+});
+test('CHAIN ZAP: a hit jumps to the next rival for half damage', () => {
+  const hits = [];
+  const ts = [{ ref: 'A', owner: { idx: 1 }, x: 80, y: 90, r: 4 }, { ref: 'B', owner: { idx: 2 }, x: 110, y: 90, r: 4 }];
+  const { w } = gunWorld({ targets: () => ts, onHit: (ref, info) => { hits.push([ref, info.kind, Math.round(info.dmg)]); return 'hit'; } });
+  const guns = new Guns(w, fx0(), NO_SOUND);
+  const g = { ...statsFor({ chain: 1 }).gun, grav: 0 };
+  guns.spawn({ idx: 0 }, 20, 90, 0, g);
+  for (let k = 0; k < 30; k++) guns.update(1 / 60);
+  eq(hits[0][0], 'A'); eq(hits[1][0], 'B'); eq(hits[1][1], 'zap');
+  ok(Math.abs(hits[1][2] - Math.round(g.dmg * 0.5)) <= 1, 'half damage');
+});
+test('SHRAPNEL: a bullet that stops breaks into 3 shards per card', () => {
+  const { w } = gunWorld({ targets: () => [] });
+  const guns = new Guns(w, fx0(), NO_SOUND);
+  guns.spawn({ idx: 0 }, 300, 90, 0, { ...statsFor({ shrapnel: 2 }).gun, grav: 0 });
+  for (let k = 0; k < 20 && guns.bullets.every((b) => !b.mini); k++) guns.update(1 / 60);
+  eq(guns.bullets.filter((b) => b.mini).length, 6);
+});
+test('ECHO SHOT: each shot fires again later; the screen never holds more than the cap', () => {
+  const { w } = gunWorld({ targets: () => [] });
+  const guns = new Guns(w, fx0(), NO_SOUND);
+  const g = statsFor({ echo: 2 }).gun, gs = newGunState(g);
+  guns.trigger({ idx: 0 }, gs, g, true, 0, 20, 90, 1 / 60);
+  eq(guns.bullets.length, 1);
+  for (let k = 0; k < 40; k++) guns.trigger({ idx: 0 }, gs, g, false, 0, 20, 90, 1 / 60);
+  eq(guns.bullets.length, 3, 'two echoes');
+  const big = statsFor({ scatter: 5, tripletap: 5, hair: 5 }).gun, gs2 = newGunState(big);
+  for (let k = 0; k < 300; k++) { guns.trigger({ idx: 0 }, gs2, big, true, 0, 20, 90, 1 / 60); guns.update(1 / 60); }
+  ok(guns.bullets.length <= 420, String(guns.bullets.length));
+});
+test('PERFECT PARRY: a hit in the first moment of a block readies the block and powers the next shots', () => {
+  const blocker = { idx: 1, st: statsFor({ parry: 1 }), blockCd: 2, blockT: 0.3 };
+  const ts = [{ ref: 'P', owner: blocker, x: 60, y: 90, r: 5 }];
+  const { w } = gunWorld({ targets: () => ts, onHit: () => 'blocked' });
+  const guns = new Guns(w, fx0(), NO_SOUND);
+  blocker.blockAt = guns.t;
+  guns.spawn({ idx: 0 }, 50, 90, 0, { ...statsFor({}).gun, grav: 0 });
+  for (let k = 0; k < 5; k++) guns.update(1 / 60);
+  eq(blocker.blockCd, 0); eq(blocker.parryShots, 3);
+});
+test('BURST BLOCK and STASIS FIELD work through the shared block hook', () => {
+  const ts = [];
+  const { w } = gunWorld({ targets: () => ts });
+  const guns = new Guns(w, fx0(), NO_SOUND);
+  const me = { idx: 0, seat: 1, st: statsFor({ burstblock: 1, stasis: 1 }), x: 160, y: 90 };
+  guns.spawn({ idx: 2 }, 150, 90, 0, { ...statsFor({}).gun, grav: 0 }); // a rival bullet next to me
+  switcheroo(me, [me], { fx: fx0(), sound: NO_SOUND });
+  guns.update(1 / 60);
+  eq(guns.bullets.filter((b) => b.owner === me).length, 6, 'ring of 6');
+  ok(guns.bullets.some((b) => b.owner && b.owner.idx === 2 && b.frozenT > 0), 'rival bullet frozen');
+});
+test('combos change the rules: FRACTAL threes, SUPERNOVA bigger blasts, CLUSTER bomblets', () => {
+  const { w } = gunWorld({ targets: () => [] });
+  const guns = new Guns(w, fx0(), NO_SOUND);
+  const sn = statsFor({ growth: 1, boomstick: 1 }).gun, plain = statsFor({ boomstick: 1 }).gun;
+  ok(guns.blastR({ g: sn, r: sn.size * 3 }, 20) > guns.blastR({ g: plain, r: plain.size * 3 }, 20) * 2);
+  const cl = statsFor({ boomstick: 1, scatter: 1 }).gun;
+  guns.blast(100, 100, 20, { idx: 0 }, 10, null, cl);
+  eq(guns.bullets.length, 4, 'four bomblets');
 });
 test('sticky bullets stick to walls, then explode', () => {
   let blasted = 0;

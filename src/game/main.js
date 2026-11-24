@@ -9,14 +9,17 @@ import { drawPlayer, SEAT_COLORS, SEAT_NAMES } from '../engine/sprites.js';
 import { rand, clamp, choice } from '../engine/util.js';
 import { readControls, installKeyboard, keyboardPads, NO_CONTROLS } from './controls.js';
 import { Match } from './match.js';
-import { POWER_BY_ID, RARITY, cardWhere, cardLines, TIPSY_NAMES, TIPSY_LINES, pickupMult } from './powers.js';
+import { POWERS, POWER_BY_ID, RARITY, MAX_STACK, cardWhere, cardLines, TIPSY_NAMES, TIPSY_LINES, pickupMult } from './powers.js';
+import { combosFor, combosUnlockedBy, COMBO_BY_ID } from './combos.js';
+import { LAYOUTS as ROOF_MAPS } from '../games/rumble.js';
 import { TWISTS } from './twists.js';
 import { GAMES } from './registry.js';
 import { Bot } from './bots.js';
 import { Drift, P, glyph, prompt, setPadStyle } from '../engine/style.js';
+import { Guns } from './weapons.js';
 import { ACTS, clockAt, cabinetQuip, drawStage, drawCrt, drawBezel, drawVoice, drawCabinet, drawNightStrip } from './night.js';
 
-export const BUILD = 'm1-2026-11-23.14-xbox-input';
+export const BUILD = 'm1-2026-11-23.15-combos';
 export { GAMES };
 // The core set: the events that pass the quality bar (docs/PLAYTEST.md, tests/measure.html).
 // Four per act, so every night builds from grounded to mind-bending. ALL EVENTS adds the rest.
@@ -81,7 +84,7 @@ function pickPadStyle() {
 }
 const settings = {
   shake: load('shake', 0), muted: load('muted', false), house: load('house', false), trip: load('look', 0), calm: load('calm', false),
-  set: load('set', 'core'), large: load('large', false), fit: load('fit', 0), music: load('music', 0), pads: load('pads', 0),
+  set: load('set', 'core'), large: load('large', false), fit: load('fit', 0), music: load('music', 0), pads: load('pads', 0), fancy: load('fancy', true),
   prompts: params.get('rules') ? params.get('rules').split('|').map((s) => s.trim()).filter(Boolean).slice(0, 12) : DEFAULT_PROMPTS,
 };
 sound.setMuted(settings.muted);
@@ -91,6 +94,7 @@ function applyLook() {
   fx.calm = settings.calm;
   fx.shakeK = settings.calm ? 0 : SHAKE_LEVELS[settings.shake].k;
   g.large = fx.large = !!settings.large;
+  g.fancy = settings.fancy !== false;
   if (!MUSIC_LEVELS[settings.music]) settings.music = 0;
   sound.setMusicVol(MUSIC_LEVELS[settings.music].v);
   if (!FIT_LEVELS[settings.fit]) settings.fit = 0;
@@ -114,6 +118,9 @@ function fit() {
   const kk = k >= 1 ? Math.floor(k * 2) / 2 : k; // prefer clean scales
   canvas.style.width = `${640 * kk}px`;
   canvas.style.height = `${360 * kk}px`;
+  // draw at the screen's real resolution (up to 1920×1080) so shapes stay sharp
+  const want = Math.ceil((640 * kk * (devicePixelRatio || 1)) / 640 - 0.15);
+  g.setRes(settings.fancy === false ? Math.min(2, want) : want);
 }
 addEventListener('resize', fit);
 
@@ -121,6 +128,7 @@ addEventListener('resize', fit);
 const st = {
   screen: 'title', t: 0, match: null, game: null, gameId: null, variants: {}, ready: new Set(),
   draft: null, awards: null, prompt: null, paused: false, sdWinner: null, finalOrder: null, viewHold: {}, events: [], opts: null, wipe: 0,
+  mode: load('mode', 'party'), setup: null, rack: null, toasts: [], sd: { map: 0, to: 5 }, sb: { game: 'rumble', map: 0, twist: 0 },
 };
 const WIPE = 0.42;
 const RECAP_STEP = 0.32;
@@ -149,13 +157,16 @@ function toIntro() {
   st.ready = new Set();
   const m = GAMES[st.gameId].meta;
   st.twistId = null;
-  if (FORCE_TWIST && TWISTS[FORCE_TWIST]) st.twistId = FORCE_TWIST;
+  if (st.mode === 'sandbox') { const tl = GAMES[st.gameId].meta.twists || []; st.twistId = st.sb.twist > 0 ? tl[st.sb.twist - 1] || null : null; }
+  else if (st.mode === 'showdown') st.twistId = null;
+  else if (FORCE_TWIST && TWISTS[FORCE_TWIST]) st.twistId = FORCE_TWIST;
   else if (!st.match.suddenDeath && st.match.eventIdx >= 1 && m.twists && m.twists.length && Math.random() < TWIST_CHANCE) st.twistId = choice(m.twists);
   st.twist = st.twistId ? { id: st.twistId, ...TWISTS[st.twistId] } : null;
   // a new act opens with the Cabinet speaking (not in practice or sudden death)
   const i = st.match.eventIdx;
   const prevAct = i > 0 ? tierOf(st.match.playlist[i - 1]) : 0;
-  if (!ONLY && !st.match.suddenDeath && tierOf(st.gameId) !== prevAct) {
+  if (st.mode === 'sandbox' || (st.mode === 'showdown' && i > 0)) { startGame(); return; } // straight back into the fight
+  if (!ONLY && st.mode === 'party' && !st.match.suddenDeath && tierOf(st.gameId) !== prevAct) {
     const k = tierOf(st.gameId);
     const rules = st.match.playlist.filter((id) => tierOf(id) === k).map((id) => GAMES[id].meta.broken).filter(Boolean);
     st.act = { k, clock: nightClock(i), rules: [...new Set(rules)] };
@@ -168,11 +179,14 @@ function toIntro() {
 }
 function startGame() {
   const id = st.gameId;
-  const v = st.match.suddenDeath ? Math.floor(rand(0, 4)) : (st.variants[id] = (st.variants[id] ?? -1) + 1);
+  let v = st.match.suddenDeath ? Math.floor(rand(0, 4)) : (st.variants[id] = (st.variants[id] ?? -1) + 1);
+  if (st.mode === 'showdown') v = st.sd.map > 0 ? st.sd.map - 1 + (Math.random() < 0.5 ? ROOF_MAPS.length : 0) : Math.floor(rand(0, ROOF_MAPS.length * 2));
+  if (st.mode === 'sandbox') v = st.sb.map;
   fx.reset();
+  Guns.current = null;
   const n = st.match.players.length;
   st.game = GAMES[id].create({
-    fx, sound, drift, variant: v, twist: st.twist,
+    fx, sound, drift, variant: v, twist: st.twist, rounds: st.mode === 'party' ? undefined : 1, practice: st.mode === 'sandbox',
     players: st.match.players.map((p) => {
       const stats = st.match.stats(p.seat);
       if (st.twist && st.twist.size) stats.size *= st.twist.size;
@@ -201,6 +215,7 @@ function finishGame() {
 }
 function afterResults() {
   if (st.match.suddenDeath) return toFinal();
+  if (st.mode === 'showdown' && st.match.players.some((p) => p.wins >= st.sd.to)) return toFinal();
   const order = st.match.draftOrder(st.lastRanking);
   if (order.length) {
     st.draft = {
@@ -222,7 +237,11 @@ function afterResults() {
 function finishDraft() {
   for (const p of st.draft.pickers) {
     const id = p.picked || p.hand[p.cur];
+    const pl = st.match.player(p.seat);
+    const before = new Set(combosFor(pl.powers).map((c) => c.id));
     st.match.pick(p.seat, id);
+    if (id === 'mashup' && pl.gained) toast(`P${p.seat} MASH-UP: ${pl.gained.map((g2) => POWER_BY_ID[g2].name).join(' + ')}`, SEAT_COLORS[p.seat - 1]);
+    for (const c of combosFor(pl.powers)) if (!before.has(c.id)) comboToast(p.seat, c);
   }
   st.draft = null;
   st.match.advance();
@@ -230,7 +249,8 @@ function finishDraft() {
 }
 function toFinal() {
   st.finalOrder = st.match.finalOrder(st.sdWinner);
-  if (!ONLY && !st.recapDone) { go('recap'); sound.music(null); return; } // the night, laid out, before the podium
+  if (st.mode === 'showdown') st.finalOrder = st.match.players.slice().sort((a, b) => b.wins - a.wins || b.points - a.points).map((p) => p.seat);
+  if (!ONLY && st.mode === 'party' && !st.recapDone) { go('recap'); sound.music(null); return; } // the night, laid out, before the podium
   st.recapDone = false;
   go('final');
   sound.music('title');
@@ -252,6 +272,193 @@ function maybePrompt() {
   if (!st.prompts.length) return false;
   go('prompt');
   return true;
+}
+
+// ---------- modes: PARTY NIGHT, SHOWDOWN, SANDBOX ----------
+export const MODES = [
+  { id: 'party', name: 'PARTY NIGHT', desc: 'A NIGHT OF EVENTS. CARDS BETWEEN EVENTS' },
+  { id: 'showdown', name: 'SHOWDOWN', desc: 'ROOFTOP DUELS. LOSERS PICK A CARD EVERY ROUND' },
+  { id: 'sandbox', name: 'SANDBOX', desc: 'PICK A MAP, STACK ANY CARDS, GO WILD' },
+];
+const modeIdx = () => Math.max(0, MODES.findIndex((m) => m.id === st.mode));
+const SB_GAMES = () => [...CORE, ...GAME_IDS.filter((id) => !CORE.includes(id))];
+function mapName(id, v) {
+  if (id === 'rumble') return `${ROOF_MAPS[v % ROOF_MAPS.length].name}${Math.floor(v / ROOF_MAPS.length) % 2 ? ' (FLIPPED)' : ''}`;
+  return `VERSION ${v + 1}`;
+}
+function setupRows() {
+  if (st.setup.mode === 'showdown') {
+    return [
+      { label: 'MAP', vals: () => ['RANDOM EVERY ROUND', ...ROOF_MAPS.map((m) => m.name)], get: () => st.sd.map, set: (i) => { st.sd.map = i; } },
+      { label: 'FIRST TO', vals: () => ['3 ROUNDS', '5 ROUNDS', '7 ROUNDS'], get: () => [3, 5, 7].indexOf(st.sd.to), set: (i) => { st.sd.to = [3, 5, 7][i]; } },
+      { label: 'START', action: true },
+    ];
+  }
+  const ids = SB_GAMES();
+  const tw = () => GAMES[st.sb.game].meta.twists || [];
+  return [
+    { label: 'EVENT', vals: () => ids.map((id) => GAMES[id].meta.name), get: () => Math.max(0, ids.indexOf(st.sb.game)), set: (i) => { st.sb.game = ids[i]; st.sb.map = 0; st.sb.twist = 0; } },
+    { label: 'MAP', vals: () => Array.from({ length: st.sb.game === 'rumble' ? ROOF_MAPS.length * 2 : 6 }, (_, v) => mapName(st.sb.game, v)), get: () => st.sb.map, set: (i) => { st.sb.map = i; } },
+    { label: 'TWIST', vals: () => ['NONE', ...tw().map((k) => (TWISTS[k] ? TWISTS[k].name : k))], get: () => st.sb.twist, set: (i) => { st.sb.twist = i; } },
+    { label: 'START', action: true },
+  ];
+}
+function openSetup(mode) { st.setup = { mode, cur: 0 }; go('setup'); sound.sfx('go'); }
+function updateSetup() {
+  const rows = setupRows();
+  const humans = input.seats.filter((s) => s.active && !isBotSeat(s));
+  const go2 = kbStart; kbStart = false;
+  for (const seat of humans) {
+    const c = readControls(seat);
+    if (st.t < 0.25) break;
+    if (c.upP || c.downP) { st.setup.cur = (st.setup.cur + (c.upP ? -1 : 1) + rows.length) % rows.length; sound.sfx('move'); }
+    const row = rows[st.setup.cur];
+    if (seat.pressed(BTN.B)) { sound.sfx('move'); go('title'); st.setup = null; return; }
+    if (row.action) { if (seat.pressed(BTN.A) || seat.pressed(BTN.X) || seat.pressed(BTN.MENU)) { beginMode(); return; } continue; }
+    const n = row.vals().length;
+    const d = c.leftP ? -1 : c.rightP || seat.pressed(BTN.A) ? 1 : 0;
+    if (d) { row.set((row.get() + d + n) % n); sound.sfx('lock'); }
+    if (seat.pressed(BTN.X) || seat.pressed(BTN.MENU)) { beginMode(); return; }
+  }
+  if (go2) beginMode();
+}
+function beginMode() {
+  const mode = st.setup.mode;
+  st.setup = null;
+  save('mode', st.mode);
+  const seats = input.seats.filter((s) => s.active).map((s) => s.n);
+  input.joinOpen = false;
+  if (mode === 'showdown') st.match = new Match(seats, ['rumble'], { perGame: 99, total: 60 });
+  else st.match = new Match(seats, [st.sb.game], { perGame: 999, total: 999 });
+  st.match.noTipsy = true; // no Winner's Curse outside a party night
+  st.variants = {}; st.sdWinner = null;
+  sound.sfx('go');
+  toIntro();
+}
+/** SANDBOX card rack: any player opens it mid-fight and stacks whatever they like. */
+const RACK_ROWS = 7;
+function openRack(seat) { st.rack = { seat, cur: st.rack ? st.rack.cur : 0, t: 0, changed: false }; sound.sfx('pick'); }
+function updateRack(dt) {
+  const r = st.rack;
+  r.t += dt;
+  const seat = seatObj(r.seat);
+  const c = readControls(seat);
+  const n = POWERS.length;
+  if (r.t < 0.15) return;
+  if (c.upP) { r.cur = (r.cur + n - 1) % n; sound.sfx('move'); }
+  if (c.downP) { r.cur = (r.cur + 1) % n; sound.sfx('move'); }
+  if (c.leftP) { r.cur = (r.cur + n - RACK_ROWS) % n; sound.sfx('move'); }
+  if (c.rightP) { r.cur = Math.min(n - 1, r.cur + RACK_ROWS); sound.sfx('move'); }
+  const pl = st.match.player(r.seat);
+  const id = POWERS[r.cur].id;
+  if (seat.pressed(BTN.A)) {
+    const before = new Set(combosFor(pl.powers).map((c2) => c2.id));
+    if (id === 'mashup') { st.match.pick(r.seat, id); toast(`MASH-UP: ${pl.gained.map((g2) => POWER_BY_ID[g2].name).join(' + ')}`, SEAT_COLORS[r.seat - 1]); r.changed = true; }
+    else if ((pl.powers[id] || 0) < MAX_STACK) { pl.powers[id] = (pl.powers[id] || 0) + 1; r.changed = true; sound.sfx('lock'); } else sound.sfx('bump');
+    for (const c2 of combosFor(pl.powers)) if (!before.has(c2.id)) comboToast(r.seat, c2);
+  }
+  if (seat.pressed(BTN.X) && pl.powers[id]) { pl.powers[id] -= 1; if (!pl.powers[id]) delete pl.powers[id]; r.changed = true; sound.sfx('move'); }
+  if (seat.pressed(BTN.LB)) { pl.powers = {}; r.changed = true; sound.sfx('lose'); }
+  if (seat.pressed(BTN.B) || seat.pressed(BTN.Y) || seat.pressed(BTN.VIEW)) {
+    const changed = r.changed;
+    st.rack = null; sound.sfx('move');
+    if (changed) startGame(); // new cards: fresh round with them
+  }
+}
+function drawRack() {
+  const r = st.rack;
+  const pl = st.match.player(r.seat);
+  const col = SEAT_COLORS[r.seat - 1];
+  g.alpha(0.9); g.rect(0, 0, 320, 180, '#07060c', true); g.alpha(1);
+  g.text(`P${r.seat} CARD RACK`, 160, 3, { scale: 3, col, align: 'center' });
+  // the list: 8 rows per column, the focused column in the middle
+  const per = RACK_ROWS, colIdx = Math.floor(r.cur / per), cols = Math.ceil(POWERS.length / per);
+  const first = Math.max(0, Math.min(cols - 3, colIdx - 1));
+  for (let ci = first; ci < Math.min(cols, first + 3); ci++) {
+    const cc = ci === colIdx ? 0 : 1;
+    const x0 = 6 + (ci - first) * 104;
+    for (let k = 0; k < per; k++) {
+      const i = ci * per + k;
+      if (i >= POWERS.length) break;
+      const pw = POWERS[i];
+      const y = 19 + k * 11;
+      const have = pl.powers[pw.id] || 0;
+      const focus = i === r.cur;
+      g.alpha(cc === 0 ? 1 : 0.45);
+      panel(x0, y, 100, 10, focus ? P.warn : '#3a3458', focus ? P.panelHi : P.panel);
+      g.rect(x0 + 2, y + 2, 6, 6, pw.col, true);
+      g.text(pw.name, x0 + 11, y + 1.5, { scale: 2, col: focus ? P.text : P.dim, shadow: null });
+      if (have) g.text(`X${have}`, x0 + 98, y + 1.5, { scale: 2, col: P.warn, align: 'right', shadow: null });
+      g.alpha(1);
+    }
+  }
+  // the focused card
+  const pw = POWERS[r.cur];
+  panel(4, 98, 216, 58, pw.col, P.panelHi);
+  g.text(pw.name, 8, 101, { scale: 2, col: P.text, shadow: null });
+  g.text(RARITY[pw.rarity].name, 216, 102, { scale: 1, col: RARITY[pw.rarity].col, align: 'right', shadow: null });
+  let ly = 111;
+  for (const ln of cardLines(pw)) ly += g.para(ln.text, 8, ly, 208, { scale: 2, col: ln.bad ? '#ff8a8a' : P.good, shadow: null }) + 1;
+  const unlock = combosUnlockedBy(pl.powers, pw.id);
+  if (unlock.length && ly < 148) g.text(`ADD IT: COMBO ${unlock[0].name}!`, 8, ly + 1, { scale: 1, col: P.warn, shadow: null });
+  // combos you have
+  const cs = combosFor(pl.powers);
+  panel(224, 98, 92, 58, cs.length ? P.warn : '#3a3458', P.panel);
+  g.text(cs.length ? `COMBOS ${cs.length}` : 'NO COMBOS', 228, 101, { scale: 2, col: cs.length ? P.warn : P.dim, shadow: null });
+  cs.slice(0, 9).forEach((c2, k) => g.text(c2.name, 228, 111 + k * 5, { scale: 1, col: P.text, shadow: null }));
+  g.rect(0, 158, 320, 22, P.ink, true);
+  let x = 6;
+  x += prompt(g, 'A', 'ADD', x, 162) + 8;
+  x += prompt(g, 'X', 'REMOVE', x, 162) + 8;
+  x += prompt(g, 'LB', 'CLEAR', x, 162) + 8;
+  x += prompt(g, 'STICK', 'BROWSE', x, 162) + 8;
+  prompt(g, 'B', 'FIGHT', x, 162);
+  drawToasts();
+}
+function drawSetup() {
+  const t = st.t;
+  drawStage(g, 2, t, drift, { calm: settings.calm });
+  const m = MODES.find((mm) => mm.id === st.setup.mode);
+  g.text(m.name, 160, 8, { scale: 4, col: P.warn, align: 'center' });
+  g.text(m.desc, 160, 30, { scale: 2, col: P.dim, align: 'center' });
+  const rows = setupRows();
+  rows.forEach((row, k) => {
+    const y = 54 + k * 18;
+    const focus = st.setup.cur === k;
+    panel(30, y - 3, 260, 14, focus ? P.warn : '#3a3458', focus ? P.panelHi : P.panel);
+    if (focus) g.text('>', 23, y, { scale: 2, col: P.warn });
+    if (row.action) { g.text(row.label, 160, y, { scale: 2, col: focus ? P.good : P.text, align: 'center', shadow: null }); return; }
+    g.text(row.label, 36, y, { scale: 2, col: focus ? P.text : P.dim, shadow: null });
+    const v = row.vals()[row.get()] || '';
+    g.text(focus ? `< ${v} >` : v, 284, y, { scale: 2, col: focus ? P.warn : P.text, align: 'right', shadow: null });
+  });
+  if (st.setup.mode === 'sandbox') g.text('IN THE FIGHT: PRESS VIEW OR Y TO OPEN YOUR CARD RACK', 160, 128, { scale: 1, col: P.good, align: 'center' });
+  else g.text('EVERY ROUND: THE LOSERS EACH TAKE A CARD. CARDS STACK. COMBOS UNLOCK.', 160, 128, { scale: 1, col: P.good, align: 'center' });
+  g.rect(0, 158, 320, 22, P.ink, true);
+  let x = 40;
+  x += prompt(g, 'STICK', 'CHOOSE', x, 162) + 10;
+  x += prompt(g, 'X', 'START', x, 162) + 10;
+  prompt(g, 'B', 'BACK', x, 162);
+  fx.draw(g);
+}
+// ---------- toasts: combo unlocked, mash-up results ----------
+function toast(text, col = P.warn, sub = null) { st.toasts.push({ text, col, sub, t: 0 }); if (st.toasts.length > 4) st.toasts.shift(); }
+function comboToast(seat, c) { toast(`P${seat} COMBO: ${c.name}`, SEAT_COLORS[seat - 1], c.text); sound.sfx('jackpot'); }
+function updateToasts(dt) { for (const q of st.toasts) q.t += dt; st.toasts = st.toasts.filter((q) => q.t < 4.2); }
+function drawToasts() {
+  st.toasts.forEach((q, k) => {
+    const a = Math.min(1, q.t * 5, (4.2 - q.t) * 2);
+    const slide = Math.max(0, 1 - q.t * 6) * 30;
+    const y = 154 - (st.toasts.length - 1 - k) * 24;
+    g.alpha(a * 0.92);
+    g.rrect(40 - slide, y, 240, q.sub ? 21 : 12, 3, P.ink, true);
+    g.alpha(a);
+    g.rect(40 - slide, y, 3, q.sub ? 21 : 12, q.col, true);
+    g.glow(160, y + 6, 60, q.col.length === 7 ? q.col : '#ffd84a', 0.15 * a, true);
+    g.text(q.text, 160 - slide, y + 2.5, { scale: 2, col: q.col, align: 'center' });
+    if (q.sub) g.text(q.sub, 160 - slide, y + 12.5, { scale: 1, col: P.text, align: 'center', shadow: null });
+    g.alpha(1);
+  });
 }
 
 // ---------- update ----------
@@ -288,8 +495,16 @@ function update(dt) {
   const inMatch = seatsInMatch();
   const missing = inMatch.filter((n) => !seatObj(n).active);
 
+  updateToasts(dt);
+  if (st.screen !== 'title' && st.screen !== 'setup') kbStart = false; // Enter that paused a game must not start one later
   if (st.opts) { fx.update(dt); return updateOptions(dt); }
   if (st.screen === 'title') return updateTitle(dt);
+  if (st.screen === 'setup') { fx.update(dt); return updateSetup(); }
+  if (st.rack) return updateRack(dt);
+  if (st.mode === 'sandbox' && ['play', 'countdown'].includes(st.screen) && !st.paused) {
+    const opener = inMatch.find((n) => !isBotSeat(seatObj(n)) && (seatObj(n).pressed(BTN.VIEW) || seatObj(n).pressed(BTN.Y)));
+    if (opener) { openRack(opener); return; }
+  }
 
   // pause (Menu) and controller drop
   if (!st.paused && (anyPressed(BTN.MENU, inMatch) || (xboxProblem() && ['countdown', 'play'].includes(st.screen)) || (missing.length && ['countdown', 'play'].includes(st.screen)))) {
@@ -341,7 +556,9 @@ function update(dt) {
       break;
     }
     case 'finish': {
-      if (st.t > 2.2) go('results');
+      if (st.mode === 'sandbox' && st.t > 1.6) startGame(); // sandbox never ends: straight into the next round
+      else if (st.mode === 'showdown' && st.t > 1.8) afterResults();
+      else if (st.t > 2.2) go('results');
       break;
     }
     case 'results': {
@@ -403,7 +620,15 @@ function updateTitle(dt) {
   if (anyPressed(BTN.B)) toggleCalm();
   if (anyPressed(BTN.RT)) wantBot += 1;
   const go2 = kbStart; kbStart = false;
-  if (input.activeCount >= MIN_PLAYERS && (anyPressed(BTN.X) || anyPressed(BTN.MENU) || go2)) { sound.sfx('go'); startMatch(); }
+  for (const s of input.seats) {
+    if (!s.active || isBotSeat(s)) continue;
+    const c = readControls(s);
+    if (c.leftP || c.rightP) { st.mode = MODES[(modeIdx() + (c.leftP ? -1 : 1) + MODES.length) % MODES.length].id; save('mode', st.mode); sound.sfx('move'); }
+  }
+  const minP = st.mode === 'sandbox' ? 1 : MIN_PLAYERS;
+  if (input.activeCount >= minP && (anyPressed(BTN.X) || anyPressed(BTN.MENU) || go2)) {
+    if (st.mode === 'party') { sound.sfx('go'); startMatch(); } else openSetup(st.mode);
+  }
 }
 
 // ---------- options ----------
@@ -414,6 +639,7 @@ const OPTS = [
   { label: 'TEXT SIZE', vals: () => ['NORMAL', 'LARGE'], get: () => (settings.large ? 1 : 0), set: (i) => { settings.large = !!i; save('large', settings.large); applyLook(); }, help: 'LARGE: BIGGER NAME TAGS AND POP-UPS' },
   { label: 'SCREEN FIT', vals: () => FIT_LEVELS.map((f) => f.name), get: () => settings.fit, set: (i) => { settings.fit = i; save('fit', i); applyLook(); }, help: 'SHRINK IT IF YOUR TV CUTS OFF THE EDGES' },
   { label: 'COLOR LOOK', vals: () => TRIP_LEVELS.map((l) => l.name), get: () => settings.trip, set: (i) => { settings.trip = i; save('look', i); applyLook(); fx.hueKick = TRIP_LEVELS[i].kick; }, help: 'HOW MUCH THE BACKGROUND COLOR DRIFTS' },
+  { label: 'GRAPHICS', vals: () => ['FANCY', 'SIMPLE'], get: () => (settings.fancy === false ? 1 : 0), set: (i) => { settings.fancy = !i; save('fancy', settings.fancy); applyLook(); }, help: 'SIMPLE: NO GLOW. TRY IT IF THE GAME STUTTERS' },
   { label: 'CALM MODE', vals: () => ['OFF', 'ON'], get: () => (settings.calm ? 1 : 0), set: (i) => { settings.calm = !!i; save('calm', settings.calm); applyLook(); }, help: 'NO FLASHES, SHAKE OR DRIFT. SAME GAME' },
   { label: 'SCREEN SHAKE', vals: () => SHAKE_LEVELS.map((l) => l.name), get: () => settings.shake, set: (i) => { settings.shake = i; save('shake', i); applyLook(); fx.shake(0.5); }, help: 'HOW HARD HITS SHAKE THE SCREEN' },
   { label: 'SOUND', vals: () => ['ON', 'OFF'], get: () => (settings.muted ? 1 : 0), set: (i) => { settings.muted = !!i; sound.setMuted(settings.muted); save('muted', settings.muted); }, help: 'ALL SOUND ON OR OFF' },
@@ -523,8 +749,10 @@ function draw() {
     case 'final': drawFinal(); break;
     case 'act': drawAct(); break;
     case 'recap': drawRecap(); break;
+    case 'setup': drawSetup(); break;
     default: break;
   }
+  if (st.rack) drawRack(); else drawToasts();
   // everything is the Cabinet's screen: scanlines on menus, the glass bezel everywhere
   if (['countdown', 'play', 'finish'].includes(st.screen)) drawBezel(g); else drawCrt(g);
   fx.drawFlash(g);
@@ -593,7 +821,6 @@ function drawTitle() {
   drawStage(g, 0, t, drift, { calm: settings.calm });
   // the bar floor, then the Cabinet: the narrator of the night, centre stage
   g.rect(0, 108, 320, 72, '#0d0820', true);
-  drawTitleCabinet(t);
   for (let k = 0; k < 8; k++) g.rect(0, 112 + k * k * 1.2, 320, 1, '#ff5fd255', true);
   const wob = (i) => Math.sin(t * 3 + i * 0.5) * 2;
   const logo = 'LAST CALL';
@@ -616,9 +843,25 @@ function drawTitle() {
   const n = input.activeCount;
   // the call to action never disappears; only its underline breathes
   g.rect(70, 57, 180, 12, P.ink, true);
-  if (n >= MIN_PLAYERS) {
-    prompt(g, 'X', 'START THE NIGHT', 160, 59, { col: P.good, align: 'center' });
-    g.alpha(0.4 + 0.3 * Math.sin(t * 3)); g.rect(96, 68, 128, 1, P.good, true); g.alpha(1);
+  const md = MODES[modeIdx()];
+  const minP = st.mode === 'sandbox' ? 1 : MIN_PLAYERS;
+  // the mode picker is the centrepiece: three doors, the chosen one lit
+  MODES.forEach((m, k) => {
+    const x = 160 + (k - modeIdx()) * 112;
+    const on = k === modeIdx();
+    const w = on ? 104 : 80, h = on ? 20 : 15, y = on ? 74 : 76.5;
+    g.alpha(on ? 1 : 0.45);
+    if (on) g.glow(x, y + h / 2, 70, '#ffd84a', 0.25 + 0.08 * Math.sin(t * 3), true);
+    g.rrect(x - w / 2, y, w, h, 4, on ? '#2a1d4a' : P.panel, true);
+    g.frame(x - w / 2, y, w, h, on ? P.warn : '#4a4270', 1, true);
+    g.text(m.name, x, y + (on ? 6.5 : 4), { scale: 2, col: on ? P.warn : P.dim, align: 'center', shadow: null });
+    if (on) { g.text('<', x - w / 2 + 3, y + 6.5, { scale: 2, col: P.warn, shadow: null }); g.text('>', x + w / 2 - 8, y + 6.5, { scale: 2, col: P.warn, shadow: null }); }
+    g.alpha(1);
+  });
+  g.text(md.desc, 160, 100, { scale: 1, col: P.text, align: 'center' });
+  g.rect(70, 57, 180, 12, P.ink, true);
+  if (n >= minP) {
+    prompt(g, 'X', st.mode === 'party' ? 'START THE NIGHT' : `PLAY ${md.name}`, 160, 59, { col: P.good, align: 'center' });
   } else if (n === 1 && MIN_PLAYERS > 1) prompt(g, 'RT', 'ADD A CPU, OR A TO JOIN', 160, 59, { col: P.text, align: 'center' });
   else prompt(g, 'A', 'JOIN', 160, 59, { col: P.text, align: 'center' });
   // settings live in OPTIONS now; the title only shows what matters before you start
@@ -637,7 +880,7 @@ function drawTitle() {
 
 const TITLE_LINES = ['THE BAR IS', 'CLOSED.', 'I AM NOT.'];
 function drawTitleCabinet(t) {
-  const x = 118, y = 72, w = 84;
+  const x = 118, y = 84, w = 84;
   g.alpha(0.25); g.rect(x - 10, y - 4, w + 20, 52, ACTS[0].accent, true); g.alpha(1); // neon glow
   g.rect(x, y, w, 44, '#1a1630', true); g.frame(x, y, w, 44, '#6a5aa0', 1, true);
   g.rect(x + 2, y + 2, w - 4, 6, '#ff5fd2', true); g.text('LAST CALL', x + w / 2, y + 2.5, { scale: 1, col: P.ink, align: 'center', shadow: null });
@@ -855,9 +1098,14 @@ function drawDraft() {
   const d = st.draft;
   const t = st.t;
   drawStage(g, tierOf(d.next), t, drift, { calm: settings.calm });
-  g.text('COMEBACK DRAFT', 160, 3, { scale: 3, col: P.warn, align: 'center' });
   const winner = st.lastRanking[0];
-  g.text(`P${winner} WON: NO CARD.  NEXT: ${GAMES[d.next].meta.name}`, 160, 17, { scale: 2, col: P.dim, align: 'center' });
+  if (st.mode === 'showdown') {
+    g.text(`ROUND ${st.match.eventIdx + 1}: PICK A CARD`, 160, 3, { scale: 3, col: P.warn, align: 'center' });
+    g.text(`P${winner} TOOK IT.  ` + st.match.players.map((q) => `P${q.seat} ${q.wins}/${st.sd.to}`).join('  '), 160, 17, { scale: 2, col: P.dim, align: 'center' });
+  } else {
+    g.text('COMEBACK DRAFT', 160, 3, { scale: 3, col: P.warn, align: 'center' });
+    g.text(`P${winner} WON: NO CARD.  NEXT: ${GAMES[d.next].meta.name}`, 160, 17, { scale: 2, col: P.dim, align: 'center' });
+  }
   const n = d.pickers.length;
   const colW = n === 1 ? 204 : 152;
   d.pickers.forEach((p, k) => {
@@ -882,6 +1130,7 @@ function drawDraft() {
         panel(x0, y, colW, rh, '#3a3458', P.panel);
         g.rect(x0 + 3, y + (rh - 9) / 2, 9, 9, pw.col, true);
         g.text(pw.name, x0 + 16, y + (rh - 7) / 2, { scale: 2, col: P.dim, shadow: null });
+        if (combosUnlockedBy(st.match.player(p.seat).powers, id).length) g.text('~ COMBO', x0 + colW - 3, y + (rh - 7) / 2, { scale: 2, col: P.warn, align: 'right', shadow: null });
         y += rh + (p.hand.length > 3 ? 2 : 3); return;
       }
       // focused or locked: the full card, everything at reading size
@@ -893,6 +1142,8 @@ function drawDraft() {
       let h = h0;
       const lineH = lines.map((ln) => Math.max(8, g.paraH(ln.text, colW - 10, 2)));
       h += lineH.reduce((a2, v) => a2 + v + 1, 0) + 12;
+      const unlock = locked ? [] : combosUnlockedBy(st.match.player(p.seat).powers, id);
+      if (unlock.length) h += 10 * unlock.length + 2;
       panel(x0, yy, colW, h, chosen ? P.good : pw.col, focus ? P.panelHi : '#132218');
       if (focus) { g.frame(x0 - 1, yy - 1, colW + 2, h + 2, P.warn, 1, true); g.text('>', x0 - 6, yy + 4, { scale: 2, col: P.warn }); }
       g.rect(x0 + 3, yy + 3, 11, 11, pw.col, true);
@@ -902,6 +1153,12 @@ function drawDraft() {
       let ly = yy + h0;
       lines.forEach((ln, k2) => { g.para(ln.text, x0 + 5, ly, colW - 10, { scale: 2, col: ln.bad ? '#ff8a8a' : P.good }); ly += lineH[k2] + 1; });
       g.text(`NEXT: ${where}`.slice(0, Math.floor((colW - 8) / 3)), x0 + 5, ly + 1, { scale: 1, col: P.warn, shadow: null });
+      unlock.forEach((c2, k4) => { // this card completes a combo: say so loudly
+        const cy = ly + 9 + k4 * 10;
+        g.rect(x0 + 2, cy, colW - 4, 9, '#3a2a00', true); g.frame(x0 + 2, cy, colW - 4, 9, P.warn, 1, true);
+        g.glow(x0 + colW / 2, cy + 4, 40, '#ffd84a', 0.25 + 0.1 * Math.sin(t * 6), true);
+        g.text(`COMBO! ${c2.name}`, x0 + colW / 2, cy + 1, { scale: 2, col: P.warn, align: 'center', shadow: null });
+      });
       if (chosen) { // the stamp lands in the corner, where the rarity was
         const k3 = Math.min(1, (t - p.lockedAt) * 5);
         g.alpha(k3); g.rect(x0 + colW - 46, yy + 2, 44, 11, P.good, true);
@@ -943,7 +1200,7 @@ function drawFinal() {
     const hop = k === 0 ? Math.abs(Math.sin(t * 4)) * 8 : 0;
     drawPlayer(g, i, x, y - hop, { size: k === 0 ? 3 : 2 });
     g.text(seatLabel(seat), x, y - (k === 0 ? 48 : 34) - hop, { scale: 2, col: SEAT_COLORS[i], align: 'center' });
-    g.text(`${p.points} PTS`, x, y + 18, { scale: 2, col: '#0b0a12', align: 'center', shadow: null });
+    g.text(st.mode === "showdown" ? `${p.wins} ROUNDS` : `${p.points} PTS`, x, y + 18, { scale: 2, col: '#0b0a12', align: 'center', shadow: null });
     const cards = Object.values(p.powers).reduce((a2, n2) => a2 + n2, 0);
     if (cards) g.text(`${cards} CARD${cards > 1 ? 'S' : ''}`, x, y + 28, { scale: 1, col: '#0b0a12', align: 'center', shadow: null });
     void h;
@@ -1039,7 +1296,7 @@ function trip(now) {
   if (settings.trip === 1) {
     const c = g.c;
     c.save(); c.globalAlpha = 0.3; c.globalCompositeOperation = 'screen'; c.drawImage(trail, 0, 0); c.restore();
-    trailC.clearRect(0, 0, 640, 360); trailC.drawImage(canvas, 0, 0);
+    trailC.clearRect(0, 0, 640, 360); trailC.drawImage(canvas, 0, 0, 640, 360);
   }
 }
 function frame(now) {

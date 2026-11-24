@@ -3,6 +3,7 @@
 // player's position lives. Only the spot moves: each player keeps their own
 // speed, health, gems and score, so a swap is a gamble, not a free win.
 import { SEAT_COLORS } from '../engine/sprites.js';
+import { blockPowers, posOf } from './blocks.js';
 
 /**
  * @param p        the player who blocked (p.st.blockSwap > 0)
@@ -15,7 +16,15 @@ import { SEAT_COLORS } from '../engine/sprites.js';
  * @param opts.also (p, q) => extra state to trade (Mirror's twins)
  * @returns the rival swapped with, or null
  */
-export function switcheroo(p, rivals, { fx, sound, alive, box, keys = ['x', 'y'], obj = (q) => q, also = null, rng = Math.random } = {}) {
+export function switcheroo(p, rivals, opts = {}) {
+  // every event calls this when someone blocks: it also runs the shared block cards (blocks.js)
+  let from = null;
+  try { from = posOf(p); } catch (e) { from = null; }
+  const q = swap(p, rivals, opts);
+  blockPowers(p, { fx: opts.fx, sound: opts.sound, from, swapped: q });
+  return q;
+}
+function swap(p, rivals, { fx, sound, alive, box, keys = ['x', 'y'], obj = (q) => q, also = null, rng = Math.random } = {}) {
   if (!p.st || !p.st.blockSwap) return null;
   const ok = alive || ((q) => !q.dead && !q.ghost && !q.out && !q.perma && !q.finished);
   const pool = rivals.filter((q) => q !== p && ok(q));

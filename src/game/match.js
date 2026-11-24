@@ -5,6 +5,19 @@ import { shuffle } from '../engine/util.js';
 
 export const POINTS = [3, 2, 1];
 
+/** MASH-UP: two random cards (never another MASH-UP), added to `powers`. Returns their ids. */
+export function mashup(powers, rng = Math.random) {
+  const got = [];
+  for (let k = 0; k < 2; k++) {
+    const pool = POWERS.filter((pw) => pw.id !== 'mashup' && (powers[pw.id] || 0) < MAX_STACK);
+    if (!pool.length) break;
+    const pick = pool[Math.floor(rng() * pool.length) % pool.length];
+    powers[pick.id] = (powers[pick.id] || 0) + 1;
+    got.push(pick.id);
+  }
+  return got;
+}
+
 /**
  * A playlist of `total` events: every game once (as far as `total` allows),
  * then repeats, at most `perGame` of each, never the same game twice in a row.
@@ -79,7 +92,7 @@ export class Match {
       p.places.push(i + 1);
       if (i === 0) p.wins += 1;
       // Winner's Curse: winners get tipsier, everyone else sobers up a level.
-      p.tipsy = i === 0 ? Math.min(MAX_TIPSY, p.tipsy + 1) : Math.max(0, p.tipsy - 1);
+      p.tipsy = this.noTipsy ? 0 : i === 0 ? Math.min(MAX_TIPSY, p.tipsy + 1) : Math.max(0, p.tipsy - 1);
       return { seat, place: i + 1, pts, tipsy: p.tipsy };
     });
     this.lastRanking = ranking.slice();
@@ -110,6 +123,8 @@ export class Match {
   pick(seat, id) {
     const p = this.player(seat);
     if ((p.powers[id] || 0) >= MAX_STACK) return false;
+    p.gained = [id];
+    if (id === 'mashup') { p.gained = mashup(p.powers, this.rng); return true; }
     p.powers[id] = (p.powers[id] || 0) + 1;
     return true;
   }

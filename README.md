@@ -11,6 +11,16 @@ Nineteen arcade minigames in three acts; a night plays 8 of them, starting groun
 - Polish audit, design guide and playtest record: [docs/audit/AUDIT.md](docs/audit/AUDIT.md) · [docs/DESIGN_GUIDE.md](docs/DESIGN_GUIDE.md) · [docs/PLAYTEST.md](docs/PLAYTEST.md)
 - Builds and test results: [BUILD_LOG.md](BUILD_LOG.md) · Original brief: [Claude_Game_Brief.md](Claude_Game_Brief.md)
 
+## Three ways to play
+On the title screen, push the stick left or right to pick a mode, then press **X**.
+- **PARTY NIGHT:** the full night of events, with a card draft between events.
+- **SHOWDOWN:** Ricochet Rooftop duels. Every round, everyone but the round winner picks a card. Pick a map (or random every round) and first to 3, 5 or 7.
+- **SANDBOX:** pick any event, any map and any twist, then fight forever. Press **View** or **Y** mid-fight to open your **card rack**: **A** adds a card, **X** removes one, **LB** clears, **B** goes back to the fight. Works with one player plus CPUs (**RT**).
+
+## Cards and combos
+Cards stack up to five deep. New cards: Growth Spurt, Sneaky, Chain Zap, Drill Bit, Shrapnel, Echo Shot, Chaos Rounds, Mash-Up (two random cards), and block cards Burst Block, Stasis Field and Perfect Parry.
+When two kinds of card meet they unlock a **combo** with a rule of its own: 14 gun combos (Pinball Wizard, Supernova, Cluster Storm, Poltergeist, Fractal, Storm Cell, Blood Moon, Flash Freeze, Slingshot, Minefield, Railgun, Hall of Mirrors, Mitosis, Hive Mind) and 8 block combos (Return to Sender, Thunderstep, Fireworks, Time Lock, Counterstrike, Second Wind, Hot Potato, Overclock). A draft card that would complete a combo says **COMBO!**; the full list is in `src/game/combos.js`.
+
 ## How to play (controller only)
 1. Each player presses **A** to join. Press **X** or **Menu ≡** to start.
 2. Each event starts with a screen that shows the goal, controls, hazards and any **twist** (Moon Gravity, Crosswind, Rubber World…). Press **A** when ready.

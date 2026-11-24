@@ -34,28 +34,28 @@ const SPAWN_SHIELD = 1.0;
 const LASER_FIRST = 6, LASER_EVERY = 8, FLOOD_AT = 9, FLOOD_SPEED = 5;
 
 export const LAYOUTS = [
-  { name: 'NEON ROOFS',
+  { name: 'NEON ROOFS', theme: { top: '#2a0b4a', bot: '#b0306a', sun: '#ffcf6a', far: '#6a2378', near: '#4a1560', win: '#ffb347', solid: '#0b0414', edge: '#ff7ad9', plat: '#3d1b66', platTop: '#ffd1f0' },
     solids: [{ x: 0, y: 150, w: 96, h: 30 }, { x: 128, y: 162, w: 64, h: 18 }, { x: 224, y: 150, w: 96, h: 30 },
       { x: 26, y: 112, w: 46, h: 4, oneWay: 1 }, { x: 248, y: 112, w: 46, h: 4, oneWay: 1 }, { x: 134, y: 96, w: 52, h: 4, oneWay: 1, crumble: 1 },
       { x: 10, y: 72, w: 38, h: 4, oneWay: 1, crumble: 1 }, { x: 272, y: 72, w: 38, h: 4, oneWay: 1, crumble: 1 }],
     movers: [{ w: 30, h: 5, ax: 98, bx: 192, ay: 128, by: 128, period: 5 }],
     saws: [{ ax: 104, ay: 150, bx: 216, by: 150, r: 7, period: 3.6 }],
     spawns: [[44, 140], [160, 150], [276, 140]] },
-  { name: 'WATER TOWER',
+  { name: 'WATER TOWER', theme: { top: '#06263a', bot: '#1f8a9a', sun: '#e9fff7', far: '#15647a', near: '#0e4a5e', win: '#7dfff0', solid: '#020b11', edge: '#5affd9', plat: '#0f4660', platTop: '#c9fff6' },
     solids: [{ x: 0, y: 156, w: 110, h: 24 }, { x: 210, y: 156, w: 110, h: 24 }, { x: 142, y: 100, w: 36, h: 80 },
       { x: 18, y: 120, w: 50, h: 4, oneWay: 1 }, { x: 252, y: 120, w: 50, h: 4, oneWay: 1 }, { x: 120, y: 66, w: 80, h: 4, oneWay: 1, crumble: 1 },
       { x: 58, y: 88, w: 34, h: 4, oneWay: 1, crumble: 1 }, { x: 228, y: 88, w: 34, h: 4, oneWay: 1, crumble: 1 }],
     movers: [{ w: 26, h: 5, ax: 112, bx: 112, ay: 150, by: 96, period: 4 }, { w: 26, h: 5, ax: 182, bx: 182, ay: 96, by: 150, period: 4 }],
     saws: [{ ax: 8, ay: 155, bx: 102, by: 155, r: 7, period: 3 }, { ax: 30, ay: 44, bx: 290, by: 44, r: 7, period: 5 }],
     spawns: [[40, 146], [160, 90], [280, 146]] },
-  { name: 'BILLBOARD',
+  { name: 'BILLBOARD', theme: { top: '#1a0838', bot: '#6a1fb0', sun: '#ff9ef0', far: '#5a2598', near: '#3a1478', win: '#ff7ad9', solid: '#070212', edge: '#c08bff', plat: '#3a1680', platTop: '#ead9ff' },
     solids: [{ x: 0, y: 160, w: 70, h: 20 }, { x: 125, y: 160, w: 70, h: 20 }, { x: 250, y: 160, w: 70, h: 20 },
       { x: 96, y: 92, w: 128, h: 10 }, { x: 0, y: 40, w: 10, h: 120 }, { x: 310, y: 40, w: 10, h: 120 },
       { x: 30, y: 122, w: 40, h: 4, oneWay: 1 }, { x: 250, y: 122, w: 40, h: 4, oneWay: 1 }, { x: 140, y: 60, w: 40, h: 4, oneWay: 1, crumble: 1 }],
     movers: [{ w: 28, h: 5, ax: 72, bx: 72, ay: 150, by: 104, period: 4.5 }, { w: 28, h: 5, ax: 220, bx: 220, ay: 104, by: 150, period: 4.5 }],
     saws: [{ ax: 100, ay: 103, bx: 220, by: 103, r: 6, period: 4 }],
     spawns: [[36, 150], [160, 86], [284, 150]] },
-  { name: 'CRANE YARD',
+  { name: 'CRANE YARD', theme: { top: '#2a1206', bot: '#c2621a', sun: '#fff0b8', far: '#8a4218', near: '#5a2810', win: '#ffd84a', solid: '#0c0502', edge: '#ffb347', plat: '#5a2e10', platTop: '#ffe3b8' },
     solids: [{ x: 0, y: 152, w: 104, h: 28 }, { x: 216, y: 152, w: 104, h: 28 },
       { x: 40, y: 62, w: 240, h: 5, oneWay: 1 }, { x: 20, y: 112, w: 50, h: 4, oneWay: 1 }, { x: 250, y: 112, w: 50, h: 4, oneWay: 1 },
       { x: 136, y: 118, w: 48, h: 4, oneWay: 1, crumble: 1 }],
@@ -63,7 +63,7 @@ export const LAYOUTS = [
     saws: [],
     pend: { ax: 160, ay: 67, len: 46, r: 8 },
     spawns: [[40, 140], [160, 55], [280, 140]] },
-  { name: 'STAIRCASE',
+  { name: 'STAIRCASE', theme: { top: '#070c2e', bot: '#2b4fb8', sun: '#cfe0ff', far: '#22348e', near: '#142070', win: '#9fd3ff', solid: '#02040f', edge: '#7aa8ff', plat: '#1a2a80', platTop: '#dbe8ff' },
     solids: [{ x: 0, y: 164, w: 60, h: 16 }, { x: 60, y: 148, w: 40, h: 32 }, { x: 100, y: 132, w: 40, h: 48 },
       { x: 180, y: 132, w: 40, h: 48 }, { x: 220, y: 148, w: 40, h: 32 }, { x: 260, y: 164, w: 60, h: 16 },
       { x: 128, y: 88, w: 64, h: 4, oneWay: 1, crumble: 1 }, { x: 20, y: 110, w: 40, h: 4, oneWay: 1 }, { x: 260, y: 110, w: 40, h: 4, oneWay: 1 }],
@@ -88,6 +88,7 @@ export function create(ctx) {
   let env = twistEnv(tw, 0);
   const drift = ctx.drift || new Drift();
 
+  const WIN = ctx.rounds || WIN_ROUNDS, MAXR = ctx.rounds === 1 ? 1 : MAX_ROUNDS;
   const players = ctx.players.map((pl, i) => {
     const st = pl.stats;
     const [sx, sy] = L.spawns[i % 3];
@@ -273,7 +274,7 @@ export function create(ctx) {
       sound.sfx('round');
       banner = { text: `P${winner.idx + 1} TAKES ROUND ${round}`, sub: how, col: SEAT_COLORS[winner.idx], t: BREAK };
     } else banner = { text: `ROUND ${round}: NOBODY`, sub: how, col: P.dim, t: BREAK };
-    const done = contenders().some((p) => p.wins >= WIN_ROUNDS) || round >= MAX_ROUNDS || t >= TIME - BREAK;
+    const done = contenders().some((p) => p.wins >= WIN) || round >= MAXR || t >= TIME - BREAK;
     if (done) endT = BREAK;
   }
   function healthiest() { return contenders().filter((p) => !p.dead).sort((a, b) => b.hp / b.maxHp - a.hp / a.maxHp)[0] || null; }
@@ -351,45 +352,55 @@ export function create(ctx) {
   game.hudInfo = (seat) => {
     const p = players.find((x) => x.seat === seat);
     if (p.perma) return { text: 'GHOST', pips: 0, pipMax: 0 };
-    return { text: p.dead ? 'OUT' : `${Math.max(0, Math.ceil((p.hp / p.maxHp) * 100))}%`, pips: p.wins, pipMax: WIN_ROUNDS, warn: !p.dead && p.hp / p.maxHp < 0.35 };
+    return { text: p.dead ? 'OUT' : `${Math.max(0, Math.ceil((p.hp / p.maxHp) * 100))}%`, pips: p.wins, pipMax: WIN, warn: !p.dead && p.hp / p.maxHp < 0.35 };
   };
   Object.defineProperty(game, 'round', { get: () => round });
   game.leader = () => (contenders().some((p) => p.wins) ? rank()[0] : null);
-  game.matchPoint = () => contenders().some((p) => p.wins === WIN_ROUNDS - 1);
+  game.matchPoint = () => WIN > 1 && contenders().some((p) => p.wins === WIN - 1);
   Object.defineProperty(game, 'timeLeft', { get: () => Math.max(0, Math.min(TIME - t, ROUND_CAP - roundT)) });
 
   game.draw = (g) => {
     const D = (c, layer = 'bg') => drift.col(c, layer);
-    // L0 backdrop: sky bands, two depths of skyline, a still moon. Quiet, darkest values.
-    g.rect(0, 0, 320, 180, D('#0d0b1f'), true);
-    for (let k = 0; k < 6; k++) g.rect(0, 40 + k * 18, 320, 18, D(['#100d26', '#120f2b', '#141030', '#161235', '#18133a', '#1a143e'][k]), true);
-    g.circle(262, 34, 12, '#d9d2f5', true); g.circle(258, 31, 12, D('#0d0b1f'), true);
+    const T = L.theme;
+    // L0 backdrop: a vivid sky, a big glowing sun, two layers of skyline. Darker than anything you play on.
+    g.vgrad(0, 0, 320, 180, D(T.top), D(T.bot));
+    g.glow(258, 46, 70, T.sun, 0.35); g.circle(258, 46, 17, T.sun, true); g.glow(258, 46, 26, T.sun, 0.5, true);
+    for (let k = 0; k < 4; k++) { g.alpha(0.25); g.rect(234, 40 + k * 5, 48, 1.5, D(T.bot), true); g.alpha(1); } // sun stripes
     const bold = drift.mode === 'bold';
-    for (const b of far) { const bob = bold ? Math.sin(drift.t * 0.4 + b.x) * 1.5 : 0; g.rect(b.x, 180 - b.h + bob, b.w, b.h, D('#17123a'), true); }
+    for (const b of far) { const bob = bold ? Math.sin(drift.t * 0.4 + b.x) * 1.5 : 0; g.rrect(b.x, 180 - b.h + bob, b.w, b.h + 4, 2, D(T.far), true); }
     for (const b of near) {
-      g.rect(b.x, 180 - b.h, b.w, b.h, D('#1e1848'), true);
-      b.lit.forEach((on, k) => { if (on) g.rect(b.x + 4 + (k % 2) * 10, 180 - b.h + 6 + Math.floor(k / 2) * 9, 3, 4, D('#5a4a3a'), true); });
+      g.rrect(b.x, 180 - b.h, b.w, b.h + 4, 2, D(T.near), true);
+      b.lit.forEach((on, k) => { if (on) { const wx = b.x + 4 + (k % 2) * 10, wy = 180 - b.h + 6 + Math.floor(k / 2) * 9; g.rect(wx, wy, 3, 4, T.win, true); g.glow(wx + 1.5, wy + 2, 5, T.win, 0.25, true); } });
     }
     if (bold) for (const m of motes) { g.alpha(0.35); g.rect(m.x, m.y, 1, 1, D('#c9b8ff'), true); g.alpha(1); }
-    if (roundT < 2.5) { g.alpha(Math.min(1, (2.5 - roundT) * 2)); g.text(L.name, 160, 26, { scale: 2, col: '#7a6ab8', align: 'center', ui: true, shadow: null }); g.alpha(1); } // arena title, then out of the way
-    // L1 arena geometry: stable bright top edges, fill drifts only a little
-    for (const s of saws) g.dotted(s.ax, s.ay, s.bx, s.by, '#5a5478', 3);
+    g.alpha(0.35); g.vgrad(0, 120, 320, 60, 'rgba(0,0,0,0)', '#000000'); g.alpha(1); // haze toward the street
+    if (roundT < 2.5) { g.alpha(Math.min(1, (2.5 - roundT) * 2)); g.text(L.name, 160, 26, { scale: 2, col: T.platTop, align: 'center', ui: true, shadow: '#000' }); g.alpha(1); } // arena title, then out of the way
+    // L1 arena geometry: solid silhouettes with a glowing neon top edge, and a soft shadow
+    for (const s of saws) g.dotted(s.ax, s.ay, s.bx, s.by, T.edge + '88', 3);
     for (const s of solids) {
       if (s.gone) continue;
       const sx = s.crumbleT != null ? Math.sin(t * 70) * 0.8 : 0;
       if (s.oneWay) {
-        g.rect(s.x + sx, s.y, s.w, s.h, s.crumble ? '#8a6c58' : D('#6f689c', 'geo'));
-        g.rect(s.x + sx, s.y, s.w, 1, s.crumble ? '#d8b49a' : '#e4defc');
-        if (s.crumble) for (let x = s.x + 3; x < s.x + s.w - 2; x += 7) g.rect(x + sx, s.y + 2, 2, 1, '#4e3a2e');
+        g.alpha(0.35); g.rrect(s.x + sx + 1.5, s.y + 2.5, s.w, s.h + 1, 2, '#000'); g.alpha(1);
+        g.rrect(s.x + sx, s.y, s.w, s.h + 1, 2, s.crumble ? '#7a4a30' : D(T.plat, 'geo'));
+        g.rrect(s.x + sx, s.y, s.w, 1.5, 1, s.crumble ? '#ffcf9a' : T.platTop);
+        g.glow(s.x + sx + s.w / 2, s.y, Math.min(30, s.w / 2), s.crumble ? '#ff9a2e' : T.edge, 0.18);
+        if (s.crumble) for (let x = s.x + 3; x < s.x + s.w - 2; x += 7) g.rect(x + sx, s.y + 2.5, 2, 1, '#3e2418');
       } else {
-        g.rect(s.x, s.y, s.w, s.h, D('#2e2858', 'geo'));
-        g.rect(s.x, s.y, s.w, 2, '#b9adff');
-        for (let y = s.y + 8; y < s.y + s.h; y += 8) g.rect(s.x + 2, y, s.w - 4, 1, D('#262048', 'geo'));
+        g.alpha(0.4); g.rect(s.x + 3, s.y + 3, s.w, s.h, '#000'); g.alpha(1);
+        g.rect(s.x, s.y, s.w, s.h, D(T.solid, 'geo'));
+        g.alpha(0.6); g.vgrad(s.x, s.y + 2, s.w, Math.min(16, s.h - 2), T.plat, T.solid, false); g.alpha(1);
+        for (let y = s.y + 10; y < s.y + s.h; y += 10) { g.alpha(0.35); g.rect(s.x + 3, y, s.w - 6, 1, T.plat); g.alpha(1); }
+        g.glow(s.x + s.w / 2, s.y, Math.min(60, s.w / 1.4), T.edge, 0.3);
+        g.rect(s.x, s.y, s.w, 2.5, T.edge);
+        g.rect(s.x, s.y, s.w, 0.8, '#ffffff');
+        g.rect(s.x, s.y, 1, s.h, T.edge + '88'); g.rect(s.x + s.w - 1, s.y, 1, s.h, T.edge + '88');
       }
     }
     for (const m of movers) { g.rect(m.x, m.y, m.w, m.h, '#ffd84a'); for (let x = 0; x < m.w; x += 6) g.rect(m.x + x, m.y + 1, 3, m.h - 2, '#2a2414'); }
     // L3 hazards: the only saturated reds on screen
     for (const s of saws) {
+      g.glow(s.x, s.y, s.r * 3, '#ff4a4a', 0.45);
       g.alpha(0.25); g.circle(s.x, s.y, s.r + 3, P.danger); g.alpha(1);
       g.circle(s.x, s.y, s.r, '#e8e4f0');
       for (let k = 0; k < 8; k++) { const a = s.rot + (k / 8) * TAU; g.rect(s.x + Math.cos(a) * (s.r + 1) - 1, s.y + Math.sin(a) * (s.r + 1) - 1, 2, 2, P.danger); }
@@ -404,7 +415,7 @@ export function create(ctx) {
       g.dotted(laser.x, 15, laser.x, 180, P.danger, 3);
       if (Math.floor(t * 5) % 2) g.text('!', laser.x, 18, { scale: 3, col: P.warn, align: 'center', ui: false });
     }
-    if (laser.state === 'on') { g.alpha(0.35); g.rect(laser.x - 5, 0, 10, 180, P.danger); g.alpha(1); g.rect(laser.x - 2, 0, 4, 180, '#ff9a9a'); g.rect(laser.x - 1, 0, 2, 180, '#fff'); }
+    if (laser.state === 'on') { for (let y = 10; y < 180; y += 24) g.glow(laser.x, y, 18, '#ff4a4a', 0.35); g.alpha(0.35); g.rect(laser.x - 5, 0, 10, 180, P.danger); g.alpha(1); g.rect(laser.x - 2, 0, 4, 180, '#ff9a9a'); g.rect(laser.x - 1, 0, 2, 180, '#fff'); }
     for (const a of anvils) {
       if (a.warn > 0) { g.ring(a.x, a.ty - 3, 8, P.danger); g.text(String(Math.ceil(a.warn * 3)), a.x, a.ty - 22, { scale: 2, col: P.warn, align: 'center', ui: false }); }
       else { g.rect(a.x - 6, a.y - 9, 12, 4, '#9a9aaa'); g.rect(a.x - 3, a.y - 5, 6, 3, '#7a7a8a'); g.rect(a.x - 5, a.y - 2, 10, 2, '#9a9aaa'); }
@@ -417,6 +428,8 @@ export function create(ctx) {
       const cx = p.b.x + p.b.w / 2;
       const shielded = p.hurtT > 0 && roundT < SPAWN_SHIELD + 0.05;
       const blink = !shielded && p.hurtT > 0 && p.hurtT < 0.5 && Math.floor(t * 8) % 2;
+      g.glow(cx, p.b.y + p.b.h / 2, 16 * p.st.size, SEAT_COLORS[p.idx], 0.22); // a soft halo in your colour
+      g.alpha(0.35); g.c.fillStyle = '#000'; g.c.beginPath(); g.c.ellipse((cx + g.ox) * 2, (groundBelow(cx) + g.oy) * 2, 9 * p.st.size * Math.max(0.3, 1 - (groundBelow(cx) - p.b.y - p.b.h) / 80), 2.4, 0, 0, TAU); g.c.fill(); g.alpha(1); // ground shadow
       drawPlayer(g, p.idx, cx, p.b.y + p.b.h, { flip: p.face < 0, size: p.st.size, flash: p.flashT > 0, alpha: blink ? 0.6 : 1, squash: p.b.squash, look: p.aim });
       drawGun(g, p.idx, cx, p.b.y + p.b.h / 2 - 1, p.aim ?? (p.face > 0 ? 0 : Math.PI), { size: p.st.size, recoil: p.recoil });
       if (shielded) { g.alpha(0.5); g.ring(cx, p.b.y + p.b.h / 2, 11 * p.st.size, SEAT_COLORS[p.idx]); g.alpha(1); }
@@ -426,12 +439,15 @@ export function create(ctx) {
       const gun = p.st.gun;
       if (p.gs.reloadT > 0) { g.rect(cx - 5, p.b.y + p.b.h + 4, 10, 1, '#3a3550'); g.rect(cx - 5, p.b.y + p.b.h + 4, 10 * guns.reloadFrac(p.gs, gun), 1, '#fff6a8'); }
       else for (let k = 0; k < gun.ammo; k++) g.rect(cx - gun.ammo * 1.25 + k * 2.5, p.b.y + p.b.h + 4, 1.5, 2, k < p.gs.ammo ? '#fff6a8' : '#3a3550');
-      const hw = 16;
-      g.rect(cx - hw / 2, p.b.y - 4, hw, 3, '#3a1020'); g.rect(cx - hw / 2, p.b.y - 4, hw * Math.max(0, p.hp / p.maxHp), 3, p.poison && p.poison.t > 0 ? '#9aff5a' : SEAT_COLORS[p.idx]);
+      const hw = 18, hk = Math.max(0, p.hp / p.maxHp);
+      g.rrect(cx - hw / 2 - 0.8, p.b.y - 5.3, hw + 1.6, 4.1, 1.6, '#0b0a12'); g.rrect(cx - hw / 2, p.b.y - 4.5, hw, 2.5, 1, '#3a1020');
+      if (hk > 0) g.rrect(cx - hw / 2, p.b.y - 4.5, hw * hk, 2.5, 1, p.poison && p.poison.t > 0 ? '#9aff5a' : SEAT_COLORS[p.idx]);
+      if (p.parryShots > 0) g.text('~'.repeat(Math.min(5, p.parryShots)), cx, p.b.y + p.b.h + 7, { scale: 1, col: '#ffd84a', align: 'center', ui: false, shadow: null });
       drawBuffs(g, p, cx, p.b.y - 7);
       drawTag(g, p.idx, cx, p.b.y - 6);
     }
     if (waterY < 182) { // electric water reads as danger: dark red body, bright crackle line
+      for (let x = 10; x < 320; x += 40) g.glow(x, waterY, 22, '#ff4a4a', 0.25);
       g.alpha(0.7); g.rect(0, waterY, 320, 182 - waterY, '#3a0d1e'); g.alpha(1);
       for (let x = 0; x < 320; x += 2) g.rect(x, waterY + Math.sin(x * 0.2 + t * 6) * 1.2, 2, 1, (x / 2 + Math.floor(t * 3)) % 7 ? P.danger : '#ffd0d0');
     }
@@ -443,6 +459,7 @@ export function create(ctx) {
       g.dotted(gh.x, gh.y + 4, gh.x, groundBelow(gh.x) - 2, gh.cd <= 0 ? P.danger : '#555', 5);
       if (gh.cd <= 0) g.text('X: ANVIL', gh.x, gh.y + 5, { scale: 1, col: P.warn, align: 'center', ui: false });
     }
+    g.vignette(0.45);
     // round banner (the event's own cue for state changes)
     if (banner) {
       const k = Math.min(1, (BREAK - banner.t) * 6 + (banner.text.startsWith('ROUND') ? 1 : 0));
@@ -457,7 +474,7 @@ export function create(ctx) {
         const by = banner.sub ? 110 : 100;
         g.rect(bx - 2, by - 1, 32, 10, P.ink, true);
         g.text(`P${p.idx + 1}`, bx, by, { scale: 1, col: SEAT_COLORS[p.idx], shadow: null });
-        for (let w = 0; w < WIN_ROUNDS; w++) { const px = bx + 14 + w * 7; if (w < p.wins) g.circle(px, by + 3.5, 2.6, SEAT_COLORS[p.idx], true); else g.ring(px, by + 3.5, 2.6, '#6a6290', true); }
+        for (let w = 0; w < WIN; w++) { const px = bx + 14 + w * 7; if (w < p.wins) g.circle(px, by + 3.5, 2.6, SEAT_COLORS[p.idx], true); else g.ring(px, by + 3.5, 2.6, '#6a6290', true); }
       });
     }
   };

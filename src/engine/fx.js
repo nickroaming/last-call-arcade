@@ -8,6 +8,7 @@ export const SHAKE_LEVELS = [
 ];
 
 export const FLASH_GAP = 0.4;
+export const MAX_PARTS = 700;
 export const FLASH_MAX = 0.25;
 
 export class Fx {
@@ -29,6 +30,9 @@ export class Fx {
   reset() { this.parts.length = 0; this.popups.length = 0; this.rings.length = 0; this.trauma = 0; this.hitstop = 0; this.slowT = 0; this.flashA = 0; }
 
   burst(x, y, n, col, { speed = 70, life = 0.5, grav = 0, size = 1, angle = 0, spread = TAU, drag = 2 } = {}) {
+    // a storm of stacked cards can ask for thousands of sparks: keep the newest few hundred
+    if (this.parts.length > MAX_PARTS) n = Math.min(n, 2);
+    if (this.parts.length > MAX_PARTS * 1.5) return;
     for (let i = 0; i < n; i++) {
       const a = angle + (Math.random() - 0.5) * spread;
       const s = speed * rand(0.3, 1);
@@ -36,7 +40,7 @@ export class Fx {
     }
   }
   dust(x, y, col = '#c9a77a', n = 4) { this.burst(x, y, n, col, { speed: 30, life: 0.35, grav: -20, angle: -Math.PI / 2, spread: Math.PI }); }
-  ring(x, y, r, col, life = 0.35) { this.rings.push({ x, y, r, col, life, max: life }); }
+  ring(x, y, r, col, life = 0.35) { if (this.rings.length < 120) this.rings.push({ x, y, r, col, life, max: life }); }
   shake(a) { if (!this.calm) this.trauma = Math.min(1, this.trauma + a); }
   stop(sec) { this.hitstop = Math.max(this.hitstop, sec); }
   slow(sec) { this.slowT = Math.max(this.slowT, sec); }
@@ -72,7 +76,7 @@ export class Fx {
     this.ring(x, y, 30, '#fff', 0.5); this.ring(x, y, 46, col, 0.7);
     this.stop(0.09); this.slow(0.45); this.shake(0.7); this.flash('#fff', 0.35);
   }
-  popup(text, x, y, col = '#fff', scale = 2) { this.popups.push({ text, x, y, col, scale, life: 0.9 }); }
+  popup(text, x, y, col = '#fff', scale = 2) { if (this.popups.length > 40) this.popups.shift(); this.popups.push({ text, x, y, col, scale, life: 0.9 }); }
 
   /** Multiplier for game time this frame. */
   timeScale() { return this.hitstop > 0 ? 0 : this.slowT > 0 ? 0.3 : 1; }
@@ -87,7 +91,7 @@ export class Fx {
     for (let i = ps.length - 1; i >= 0; i--) {
       const p = ps[i];
       p.life -= dt;
-      if (p.life <= 0) { ps.splice(i, 1); continue; }
+      if (p.life <= 0) { ps[i] = ps[ps.length - 1]; ps.pop(); continue; }
       p.vy += p.grav * dt;
       p.vx -= p.vx * p.drag * dt; p.vy -= p.vy * p.drag * dt * 0.5;
       p.x += p.vx * dt; p.y += p.vy * dt;
@@ -111,18 +115,35 @@ export class Fx {
   draw(g) {
     for (const r of this.rings) {
       const k = 1 - r.life / r.max;
-      g.alpha(r.life / r.max);
-      g.ring(r.x, r.y, r.r * (0.3 + k * 0.7), r.col);
-      g.ring(r.x, r.y, r.r * (0.3 + k * 0.7) - 1, r.col);
+      const a = r.life / r.max;
+      const rr = r.r * (0.3 + k * 0.7);
+      g.alpha(a);
+      g.ring(r.x, r.y, rr, r.col, false, 1.6 * (1 - k) + 0.6);
       g.alpha(1);
+      if (r.r < 40) g.glow(r.x, r.y, rr * 0.9, r.col, a * 0.12);
     }
     for (const p of this.parts) {
-      const s = p.size * (p.life > p.max * 0.3 ? 1 : 0.5) || 1;
-      g.rect(p.x - s / 2, p.y - s / 2, Math.max(1, s), Math.max(1, s), p.col);
+      const k = Math.max(0, p.life / p.max);
+      const s = p.size * (0.45 + 0.75 * Math.min(1, k * 1.6));
+      const sp = Math.hypot(p.vx, p.vy);
+      if (sp > 60) { // fast sparks stretch along their path
+        const len = Math.min(6, sp * 0.03);
+        g.alpha(Math.min(1, k * 2));
+        g.beam(p.x - (p.vx / sp) * len, p.y - (p.vy / sp) * len, p.x, p.y, Math.max(0.7, s), p.col);
+        g.alpha(1);
+      } else {
+        g.alpha(Math.min(1, k * 2));
+        g.circle(p.x, p.y, Math.max(0.5, s * 0.6), p.col);
+        g.alpha(1);
+      }
+      if (k > 0.5 && p.size > 1) g.glow(p.x, p.y, 2.5 + s * 1.5, p.col, 0.25 * k);
     }
     for (const p of this.popups) {
+      const age = 0.9 - p.life;
+      const pop = age < 0.12 ? 1 + (0.12 - age) * 4 : 1; // pops in big, settles
       g.alpha(Math.min(1, p.life * 3));
-      g.text(p.text, p.x, p.y, { scale: this.large ? Math.max(2, p.scale) : p.scale, col: p.col, align: 'center', ui: false });
+      const sc = this.large ? Math.max(2, p.scale) : p.scale;
+      g.text(p.text, p.x, p.y - (pop - 1) * 4, { scale: Math.round(sc * pop), col: p.col, align: 'center', ui: false });
       g.alpha(1);
     }
   }

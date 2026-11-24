@@ -2,7 +2,10 @@
 // rarities. Everything writes to one stat block, so cards stack and combo
 // in every minigame. Also: the Winner's Curse (tipsy) and pickup buffs.
 
-export const MAX_STACK = 2;
+import { combosFor } from './combos.js';
+
+// Cards stack up to five deep: the fun is in how far a build can go.
+export const MAX_STACK = 5;
 export const RARITY = {
   common: { name: 'COMMON', col: '#c8c0ff', weight: 6 },
   uncommon: { name: 'UNCOMMON', col: '#5affd9', weight: 3 },
@@ -12,12 +15,13 @@ export const RARITY = {
 export function baseStats() {
   return {
     hp: 100, speed: 1, jump: 1, airJumps: 1, grav: 1, size: 1, knockTaken: 1, shields: 0,
-    blockCd: 1, blockShock: 0, blockBlink: 0, blockSwap: 0, blockHeal: 0, reflect: false, magnet: 0,
+    blockCd: 1, blockShock: 0, blockBlink: 0, blockSwap: 0, blockHeal: 0, blockBurst: 0, blockStasis: 0, parry: 0, reflect: false, magnet: 0,
     tipsy: 0, wobble: 0, mult: 1,
     gun: {
       dmg: 34, pellets: 1, spread: 0.14, speed: 240, grav: 1, size: 1.6, ammo: 3, reload: 1.2, delay: 0.28, burst: 1,
       bounces: 0, bounceDmg: 1, homing: 0, retarget: 0, explode: 0, sticky: 0, split: 0, accel: 0, wave: 0,
       knock: 1, lifesteal: 0, poison: 0, frost: 0, ghost: false, boomerang: false, sway: 0,
+      grow: 0, sneak: 0, chain: 0, pierce: 0, shrapnel: 0, echo: 0, chaos: 0,
     },
   };
 }
@@ -70,7 +74,21 @@ export const POWERS = [
     (s) => { s.gun.poison += 1; s.gun.speed *= 0.9; }),
   P('snake', 'SNAKE SHOT', 'uncommon', 'gun', ['Bullets slither in a wave', '+30% damage'],
     (s) => { s.gun.wave += 1; s.gun.dmg *= 1.3; }),
+  P('growth', 'GROWTH SPURT', 'uncommon', 'gun', ['Bullets grow as they fly', 'Bigger bullet, bigger hit', '-20% bullet speed'],
+    (s) => { s.gun.grow += 0.9; s.gun.speed *= 0.8; }),
+  P('sneaky', 'SNEAKY', 'uncommon', 'gun', ['Bullets vanish, then show up near a rival', '+15% damage', '-10% bullet speed'],
+    (s) => { s.gun.sneak += 1; s.gun.dmg *= 1.15; s.gun.speed *= 0.9; }),
+  P('chain', 'CHAIN ZAP', 'uncommon', 'gun', ['Hits jump to a 2nd rival for 50%', '-15% damage'],
+    (s) => { s.gun.chain += 1; s.gun.dmg *= 0.85; }),
+  P('drill', 'DRILL BIT', 'uncommon', 'gun', ['Bullets drill through rivals', '+1 rival per card', '-20% damage'],
+    (s) => { s.gun.pierce += 1; s.gun.dmg *= 0.8; }),
+  P('shrapnel', 'SHRAPNEL', 'uncommon', 'gun', ['Bullets burst into 3 shards when they stop', '-20% damage'],
+    (s) => { s.gun.shrapnel += 1; s.gun.dmg *= 0.8; }),
   // ---- block: uncommon ----
+  P('burstblock', 'BURST BLOCK', 'uncommon', 'block', ['Blocking fires a ring of your bullets', 'Uses every gun card you have', 'Block recharges 25% slower'],
+    (s) => { s.blockBurst += 1; s.blockCd *= 1.25; }),
+  P('stasis', 'STASIS FIELD', 'uncommon', 'block', ['Blocking freezes rival bullets nearby', 'Block recharges 10% slower'],
+    (s) => { s.blockStasis += 1; s.blockCd *= 1.1; }),
   P('shockblock', 'SHOCK BLOCK', 'uncommon', 'block', ['Blocking blasts a shockwave', 'Block recharges 20% slower'],
     (s) => { s.blockShock += 1; s.blockCd *= 1.2; }),
   P('blink', 'BLINK BLOCK', 'uncommon', 'block', ['Blocking teleports you toward your stick', 'Block recharges 15% slower'],
@@ -99,11 +117,19 @@ export const POWERS = [
     (s) => { s.gun.sticky = 1; s.gun.explode = Math.max(s.gun.explode, 24); s.gun.reload += 0.5; }),
   P('boomerang', 'BOOMERANG', 'rare', 'gun', ['Bullets fly back and can hit twice', '-15% bullet speed'],
     (s) => { s.gun.boomerang = true; s.gun.speed *= 0.85; }),
+  P('echo', 'ECHO SHOT', 'rare', 'gun', ['Every shot fires again 0.3s later', '+1 echo per card', '-0.4s slower reload'],
+    (s) => { s.gun.echo += 1; s.gun.reload += 0.4; }),
+  P('chaos', 'CHAOS ROUNDS', 'rare', 'gun', ['Every bullet gets a random power', 'Bounce, hunt, boom, split, grow...', '-10% damage'],
+    (s) => { s.gun.chaos += 1; s.gun.dmg *= 0.9; }),
+  P('parry', 'PERFECT PARRY', 'rare', 'block', ['Block just as a hit lands: block back at once', 'Then your next 3 shots hit +60%', 'Block recharges 10% slower'],
+    (s) => { s.parry += 1; s.blockCd *= 1.1; }),
+  P('mashup', 'MASH-UP', 'rare', 'gun', ['Take 2 random cards right now', 'Any rarity, any combo', 'You get their downsides too'],
+    () => {}),
   P('magnet', 'MAGNET', 'rare', 'body', ['Pulls coins, paint and the ball your way', 'Rival bullets curve toward you'],
     (s) => { s.magnet += 1; }),
 ];
 
-const BADN = { tripletap: 2, springs: 0, pinball: 2, boomstick: 2, snake: 0, mirror: 0 };
+const BADN = { tripletap: 2, springs: 0, pinball: 2, boomstick: 2, snake: 0, mirror: 0, growth: 1, sneaky: 1, mashup: 1, parry: 1, chaos: 1, echo: 1 };
 for (const p of POWERS) p.badN = BADN[p.id] ?? 1;
 /** Card lines with a +/- marker so good and bad don't rely on colour. */
 export function cardLines(card) {
@@ -122,7 +148,7 @@ export function cardWhere(card, meta) {
   return meta.bodyUse || 'Your body';
 }
 
-function clone(s) { return { ...s, gun: { ...s.gun } }; }
+function clone(s) { return { ...s, gun: { ...s.gun, cx: { ...(s.gun.cx || {}) } }, cx: { ...(s.cx || {}) } }; }
 
 export function statsFor(powers, { tipsy = 0 } = {}) {
   const s = baseStats();
@@ -131,17 +157,32 @@ export function statsFor(powers, { tipsy = 0 } = {}) {
     if (!p) continue;
     for (let i = 0; i < Math.min(n, MAX_STACK); i++) p.apply(s);
   }
+  applyCombos(s, powers);
   applyTipsy(s, tipsy);
   return finish(s);
+}
+/** Combo flags (and the few combos that are plain stat changes). */
+function applyCombos(s, powers) {
+  const list = combosFor(powers);
+  s.combos = list.map((c) => c.id);
+  s.cx = {}; s.gun.cx = {};
+  for (const c of list) { s.cx[c.id] = true; if (c.kind === 'gun') s.gun.cx[c.id] = true; }
+  if (s.cx.bloodmoon) s.gun.poison *= 1.5;
+  if (s.cx.railgun) { s.gun.grav = 0; s.gun.pierce += 99; s.gun.dmg *= 1.4; }
+  if (s.cx.hivemind) s.gun.homing = Math.max(s.gun.homing, 0.7);
+  if (s.cx.secondwind) { s.blockHeal *= 2; }
 }
 function finish(s) {
   s.hp = Math.max(25, Math.round(s.hp));
   s.size = Math.max(0.5, Math.min(1.8, s.size));
-  s.gun.delay = Math.max(0.06, s.gun.delay);
+  s.gun.delay = Math.max(0.05, s.gun.delay);
   s.gun.reload = Math.max(0.3, s.gun.reload);
-  s.gun.ammo = Math.min(14, s.gun.ammo);
-  s.gun.bounces = Math.min(12, s.gun.bounces);
-  s.gun.pellets = Math.min(12, s.gun.pellets);
+  s.gun.ammo = Math.min(30, s.gun.ammo);
+  s.gun.bounces = Math.min(25, s.gun.bounces);
+  s.gun.pellets = Math.min(24, s.gun.pellets);
+  s.gun.size = Math.min(7, s.gun.size);
+  s.gun.echo = Math.min(4, s.gun.echo);
+  s.blockCd = Math.min(4, s.blockCd);
   return s;
 }
 
